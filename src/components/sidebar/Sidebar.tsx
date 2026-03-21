@@ -34,7 +34,7 @@ export default function Sidebar() {
             No tables loaded
           </p>
         ) : (
-          tables.map((t) => <TableSchema key={t.name} table={t} />)
+          tables.map((t) => <TableSchema key={t.name} table={t} onRemove={removeTable} />)
         )}
       </div>
     </div>

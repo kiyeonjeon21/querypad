@@ -42,8 +42,7 @@ export async function loadFileAsTable(
           // Check plugin file loaders
           const sql = await tryPluginFileLoader(ext, buffer, file.name);
           if (sql) {
-            await conn.query(`DROP TABLE IF EXISTS "${tableName}"`);
-            await conn.query(`CREATE TABLE "${tableName}" AS ${sql}`);
+            await conn.query(`CREATE OR REPLACE TABLE "${tableName}" AS ${sql}`);
             const columns = await describeTable(tableName);
             const countResult = await conn.query(`SELECT COUNT(*) as cnt FROM "${tableName}"`);
             const rowCount = Number(countResult.toArray()[0]?.cnt ?? 0);
@@ -55,8 +54,7 @@ export async function loadFileAsTable(
     }
   }
 
-  await conn.query(`DROP TABLE IF EXISTS "${tableName}"`);
-  await conn.query(`CREATE TABLE "${tableName}" AS SELECT * FROM ${readFn}`);
+  await conn.query(`CREATE OR REPLACE TABLE "${tableName}" AS SELECT * FROM ${readFn}`);
 
   const columns = await describeTable(tableName);
   const countResult = await conn.query(`SELECT COUNT(*) as cnt FROM "${tableName}"`);
@@ -106,8 +104,7 @@ export async function loadBufferAsTable(
     }
   }
 
-  await conn.query(`DROP TABLE IF EXISTS "${name}"`);
-  await conn.query(`CREATE TABLE "${name}" AS SELECT * FROM ${readFn}`);
+  await conn.query(`CREATE OR REPLACE TABLE "${name}" AS SELECT * FROM ${readFn}`);
 
   const columns = await describeTable(name);
   const countResult = await conn.query(`SELECT COUNT(*) as cnt FROM "${name}"`);

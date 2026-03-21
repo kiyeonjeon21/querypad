@@ -7,6 +7,7 @@ import {
   loadWorkspace,
   clearPersistedWorkspace,
 } from "@/lib/persistence/indexeddb";
+import { getConnection } from "@/lib/duckdb/instance";
 
 interface FileEntry {
   name: string;
@@ -85,7 +86,7 @@ interface WorkspaceState {
   unloadPlugin: (id: string) => void;
 }
 
-export const useWorkspaceStore = create<WorkspaceState>((set) => ({
+export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   dbReady: false,
   setDbReady: (ready) => set({ dbReady: ready }),
 
@@ -175,13 +176,30 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
         { name: table.name, fileName, data: new Uint8Array(data) },
       ],
     })),
-  removeTable: (name) =>
+  removeTable: async (name) => {
     set((state) => ({
       tables: state.tables.filter((t) => t.name !== name),
       fileEntries: state.fileEntries.filter((f) => f.name !== name),
-    })),
+    }));
+    try {
+      const conn = await getConnection();
+      await conn.query(`DROP TABLE IF EXISTS "${name}"`);
+    } catch (err) {
+      console.error("Failed to drop table:", err);
+    }
+  },
 
   clearWorkspace: async () => {
+    // Drop all tables from DuckDB before clearing store
+    const currentTables = get().tables;
+    try {
+      const conn = await getConnection();
+      for (const t of currentTables) {
+        await conn.query(`DROP TABLE IF EXISTS "${t.name}"`);
+      }
+    } catch (err) {
+      console.error("Failed to drop tables:", err);
+    }
     await clearPersistedWorkspace();
     const tab = createTab(1);
     set({

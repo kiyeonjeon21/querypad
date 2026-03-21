@@ -85,10 +85,12 @@ export default function Workspace() {
     }
   }, [dbReady, _hydrated, isSharedPage, restoreFromIndexedDB]);
 
-  // Preload sample data for first-time visitors
+  // Preload sample data for first-time visitors only
   useEffect(() => {
-    if (!dbReady || !_hydrated || tables.length > 0 || isSharedPage || preloadAttempted.current) return;
+    const alreadyPreloaded = localStorage.getItem("querypad:preloaded") === "1";
+    if (!dbReady || !_hydrated || tables.length > 0 || isSharedPage || preloadAttempted.current || alreadyPreloaded) return;
     preloadAttempted.current = true;
+    localStorage.setItem("querypad:preloaded", "1");
 
     const preload = async () => {
       setPreloading(true);
@@ -413,19 +415,9 @@ GROUP BY d.dept_name`;
         </div>
       </div>
 
-      {/* Global drop overlay — visual only; actual drop is handled by Workspace's handleDrop */}
+      {/* Global drop indicator — subtle border highlight */}
       {showDropOverlay && (
-        <div className="fixed inset-0 z-50 bg-white/80 backdrop-blur-sm flex items-center justify-center pointer-events-none">
-          <div className="flex flex-col items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center">
-              <svg className="w-8 h-8 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-              </svg>
-            </div>
-            <p className="text-lg font-medium text-gray-700">Drop files anywhere</p>
-            <p className="text-sm text-gray-500">Parquet, CSV, JSON, Excel files supported</p>
-          </div>
-        </div>
+        <div className="fixed inset-0 z-50 pointer-events-none border-3 border-blue-400 rounded-lg m-1 transition-opacity" />
       )}
 
       {/* Modals */}

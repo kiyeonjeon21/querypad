@@ -71,6 +71,7 @@ Open `http://localhost:3000`. Sample data is automatically loaded on first visit
 - Multi-statement SQL support — semicolon-separated queries execute sequentially, last result displayed
 - Share URL v2 binary format — eliminates double base64 encoding, supports larger datasets reliably
 - Backward-compatible decoding for existing v1 share links
+- Clean floating-point display — removes IEEE 754 noise (e.g. `869.8600000000001` → `869.86`)
 
 ### v0.4 — Onboarding & File Management
 

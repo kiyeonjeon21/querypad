@@ -12,8 +12,7 @@
     "postinstall": "node scripts/copy-duckdb-wasm.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.80.0",
-    "@dagrejs/dagre": "^2.0.4",
+"@dagrejs/dagre": "^2.0.4",
     "@duckdb/duckdb-wasm": "^1.33.1-dev20.0",
     "@monaco-editor/react": "^4.7.0",
     "@tanstack/react-virtual": "^3.13.23",

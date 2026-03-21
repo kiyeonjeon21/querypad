@@ -46,6 +46,10 @@ yarn-error.log*
 # screenshots
 *.png
 
+# internal docs
+FEEDBACK.md
+ROADMAP-PHASE4.md
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

@@ -12,10 +12,11 @@
     "postinstall": "node scripts/copy-duckdb-wasm.mjs"
   },
   "dependencies": {
-"@dagrejs/dagre": "^2.0.4",
+    "@dagrejs/dagre": "^2.0.4",
     "@duckdb/duckdb-wasm": "^1.33.1-dev20.0",
     "@monaco-editor/react": "^4.7.0",
     "@tanstack/react-virtual": "^3.13.23",
+    "@vercel/analytics": "^2.0.1",
     "@xyflow/react": "^12.10.1",
     "idb-keyval": "^6.2.2",
     "next": "16.2.0",

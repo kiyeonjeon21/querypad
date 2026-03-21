@@ -8,7 +8,9 @@ A browser-native SQL playground powered by DuckDB-Wasm. Drag & drop CSV, Parquet
   <a href="https://querypad.io"><strong>Try it now</strong></a>
 </p>
 
-https://github.com/user-attachments/assets/5fa069e0-aaa2-4cc1-9735-df93b840f44d
+<p align="center">
+  <video src="https://github.com/user-attachments/assets/5fa069e0-aaa2-4cc1-9735-df93b840f44d" width="100%" />
+</p>
 
 ## Why QueryPad?
 

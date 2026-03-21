@@ -49,6 +49,7 @@ yarn-error.log*
 # internal docs
 FEEDBACK.md
 ROADMAP-PHASE4.md
+DEMO.md
 
 # typescript
 *.tsbuildinfo

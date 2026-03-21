@@ -2,6 +2,8 @@
 
 > **Drop a file. Query with SQL. Share with a link.**
 
+**[Try it now](https://querypad-delta.vercel.app/)** — no install required.
+
 A browser-native SQL playground powered by DuckDB-Wasm. Drag & drop Parquet, CSV, JSON, or Excel files, write SQL queries, visualize results — all in your browser. No server, no account, no install.
 
 ## Features

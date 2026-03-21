@@ -11,9 +11,11 @@ const ACCEPTED_EXTENSIONS = [".parquet", ".csv", ".tsv", ".json", ".jsonl", ".nd
 
 interface DropZoneProps {
   compact?: boolean;
+  highlight?: boolean;
+  onFilesAdded?: () => void;
 }
 
-export default function DropZone({ compact }: DropZoneProps) {
+export default function DropZone({ compact, highlight, onFilesAdded }: DropZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const addTable = useWorkspaceStore((s) => s.addTable);
@@ -22,6 +24,7 @@ export default function DropZone({ compact }: DropZoneProps) {
   const handleFiles = useCallback(
     async (files: FileList | File[]) => {
       setIsLoading(true);
+      let addedAny = false;
       try {
         for (const file of Array.from(files)) {
           const ext = "." + file.name.split(".").pop()?.toLowerCase();
@@ -29,6 +32,7 @@ export default function DropZone({ compact }: DropZoneProps) {
           const data = new Uint8Array(await file.arrayBuffer());
           const table = await loadFileAsTable(file);
           addTable(table, file.name, data);
+          addedAny = true;
           // Broadcast to peers if in a room
           if (roomId) {
             broadcastFile(table.name, file.name, data);
@@ -38,9 +42,10 @@ export default function DropZone({ compact }: DropZoneProps) {
         console.error("File load error:", err);
       } finally {
         setIsLoading(false);
+        if (addedAny) onFilesAdded?.();
       }
     },
-    [addTable, roomId]
+    [addTable, roomId, onFilesAdded]
   );
 
   const onDrop = useCallback(
@@ -61,7 +66,11 @@ export default function DropZone({ compact }: DropZoneProps) {
 
   if (compact) {
     return (
-      <label className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded cursor-pointer transition-colors">
+      <label className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded cursor-pointer transition-colors ${
+        highlight
+          ? "text-blue-600 bg-blue-50 hover:bg-blue-100"
+          : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+      }`}>
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
         </svg>

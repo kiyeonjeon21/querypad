@@ -4,7 +4,8 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
 import { getDB } from "@/lib/duckdb/instance";
-import { loadBufferAsTable } from "@/lib/duckdb/files";
+import { SAMPLE_TABLE_NAMES } from "@/lib/constants";
+import { loadBufferAsTable, loadFileAsTable } from "@/lib/duckdb/files";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useCollaborationStore } from "@/stores/collaboration-store";
 import { connectToRoom } from "@/lib/collaboration/sync";
@@ -51,6 +52,7 @@ export default function Workspace() {
   const isSharedPage = pathname === "/shared";
 
   const addTable = useWorkspaceStore((s) => s.addTable);
+  const removeTable = useWorkspaceStore((s) => s.removeTable);
   const updateTab = useWorkspaceStore((s) => s.updateTab);
   const activeTabId = useWorkspaceStore((s) => s.activeTabId);
 
@@ -58,6 +60,18 @@ export default function Workspace() {
   const [showJoinDialog, setShowJoinDialog] = useState(false);
   const [preloading, setPreloading] = useState(false);
   const preloadAttempted = useRef(false);
+
+  // Global drag-and-drop overlay
+  const [showDropOverlay, setShowDropOverlay] = useState(false);
+  const dragCounter = useRef(0);
+
+  // Welcome banner
+  const onlySampleTables =
+    tables.length > 0 && tables.every((t) => SAMPLE_TABLE_NAMES.has(t.name));
+  const [welcomeDismissed, setWelcomeDismissed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("querypad:welcome-dismissed") === "1";
+  });
 
   useEffect(() => {
     getDB()
@@ -113,6 +127,76 @@ GROUP BY d.dept_name`;
 
     preload();
   }, [dbReady, _hydrated, tables.length, isSharedPage, addTable, updateTab, activeTabId]);
+
+  // Stable ref for onlySampleTables so native listeners always see current value
+  const onlySampleTablesRef = useRef(onlySampleTables);
+  onlySampleTablesRef.current = onlySampleTables;
+
+  // Global drag-and-drop via native document listeners (works reliably across all browsers)
+  useEffect(() => {
+    if (isSharedPage) return;
+
+    const onDragEnter = (e: DragEvent) => {
+      e.preventDefault();
+      dragCounter.current++;
+      if (e.dataTransfer?.types.includes("Files")) {
+        setShowDropOverlay(true);
+      }
+    };
+    const onDragOver = (e: DragEvent) => {
+      e.preventDefault();
+    };
+    const onDragLeave = (e: DragEvent) => {
+      e.preventDefault();
+      dragCounter.current--;
+      if (dragCounter.current === 0) {
+        setShowDropOverlay(false);
+      }
+    };
+    const onDrop = async (e: DragEvent) => {
+      e.preventDefault();
+      dragCounter.current = 0;
+      setShowDropOverlay(false);
+      const files = e.dataTransfer?.files;
+      if (!files?.length) return;
+      const ACCEPTED = [".parquet", ".csv", ".tsv", ".json", ".jsonl", ".ndjson", ".xlsx"];
+      const hadOnlySamples = onlySampleTablesRef.current;
+      let addedAny = false;
+      for (const file of Array.from(files)) {
+        const ext = "." + file.name.split(".").pop()?.toLowerCase();
+        if (!ACCEPTED.includes(ext)) continue;
+        try {
+          const data = new Uint8Array(await file.arrayBuffer());
+          const table = await loadFileAsTable(file);
+          addTable(table, file.name, data);
+          addedAny = true;
+        } catch (err) {
+          console.error("File load error:", err);
+        }
+      }
+      if (hadOnlySamples && addedAny) {
+        for (const name of SAMPLE_TABLE_NAMES) {
+          removeTable(name);
+        }
+      }
+    };
+
+    document.addEventListener("dragenter", onDragEnter);
+    document.addEventListener("dragover", onDragOver);
+    document.addEventListener("dragleave", onDragLeave);
+    document.addEventListener("drop", onDrop);
+    return () => {
+      document.removeEventListener("dragenter", onDragEnter);
+      document.removeEventListener("dragover", onDragOver);
+      document.removeEventListener("dragleave", onDragLeave);
+      document.removeEventListener("drop", onDrop);
+    };
+  }, [isSharedPage, addTable, removeTable]);
+
+  const dismissWelcome = useCallback(() => {
+    setWelcomeDismissed(true);
+    localStorage.setItem("querypad:welcome-dismissed", "1");
+  }, []);
 
   const handleCreateRoom = useCallback(
     async (host: string) => {
@@ -253,6 +337,21 @@ GROUP BY d.dept_name`;
         </div>
       </header>
 
+      {onlySampleTables && !welcomeDismissed && !isSharedPage && (
+        <div className="flex items-center justify-between px-4 py-2 bg-blue-50 border-b border-blue-100 text-sm text-blue-700">
+          <span>Exploring with sample data — drop your own files anywhere to get started</span>
+          <button
+            onClick={dismissWelcome}
+            className="ml-4 p-0.5 text-blue-400 hover:text-blue-600 transition-colors"
+            aria-label="Dismiss"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-1 min-h-0">
         <Sidebar />
         <div className="flex-1 flex flex-col min-w-0">
@@ -313,6 +412,21 @@ GROUP BY d.dept_name`;
           )}
         </div>
       </div>
+
+      {/* Global drop overlay — visual only; actual drop is handled by Workspace's handleDrop */}
+      {showDropOverlay && (
+        <div className="fixed inset-0 z-50 bg-white/80 backdrop-blur-sm flex items-center justify-center pointer-events-none">
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center">
+              <svg className="w-8 h-8 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+              </svg>
+            </div>
+            <p className="text-lg font-medium text-gray-700">Drop files anywhere</p>
+            <p className="text-sm text-gray-500">Parquet, CSV, JSON, Excel files supported</p>
+          </div>
+        </div>
+      )}
 
       {/* Modals */}
       {showPluginManager && (

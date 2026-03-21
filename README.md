@@ -262,12 +262,84 @@ Chrome은 2MB URL까지 지원하지만, 프록시/CDN/웹서버 기본값(8KB)�
 
 ## 배포
 
-```bash
-npm run build
+### Vercel 배포 (권장)
+
+**1단계: Vercel 프로젝트 연결**
+
+[vercel.com/new](https://vercel.com/new)에서 GitHub 리포지토리 `vericontext/querypad`를 선택합니다.
+
+**2단계: 환경 변수 설정**
+
+Vercel 대시보드 → Settings → Environment Variables에서 추가:
+
+| 변수 | 필수 | 설명 |
+|------|------|------|
+| `ANTHROPIC_API_KEY` | 선택 | AI SQL 어시스턴트용. 없으면 AI 기능만 비활성화 |
+
+> DuckDB-Wasm, 파일 로드, SQL 실행, 차트, 내보내기, 파이프라인, 플러그인은 모두 브라우저에서 실행되므로 서버 환경 변수가 필요 없습니다.
+
+**3단계: 빌드 설정 (자동 감지됨)**
+
+| 항목 | 값 |
+|------|------|
+| Framework Preset | Next.js |
+| Build Command | `npm run build` |
+| Output Directory | `.next` |
+| Install Command | `npm install` |
+| Node.js Version | 20.x |
+
+**4단계: Deploy 클릭**
+
+배포 완료 후 `https://your-project.vercel.app`에서 바로 사용 가능합니다.
+
+### WASM 파일 서빙
+
+`postinstall` 스크립트가 DuckDB-Wasm 파일을 `public/duckdb/`에 자동 복사합니다.
+`next.config.ts`에서 `/duckdb/*` 경로에 적절한 Content-Type과 캐시 헤더가 설정되어 있습니다:
+
+```
+Content-Type: application/wasm
+Cache-Control: public, max-age=31536000, immutable
 ```
 
-Vercel에 배포 시 WASM 파일은 `public/duckdb/`에서 자동 서빙됩니다.
-`postinstall` 스크립트가 `node_modules`에서 WASM 파일을 복사합니다.
+### 커스텀 도메인
+
+Vercel 대시보드 → Settings → Domains에서 커스텀 도메인을 추가할 수 있습니다.
+DNS에 CNAME 레코드(`cname.vercel-dns.com`)를 추가하면 HTTPS가 자동 설정됩니다.
+
+### 실시간 협업 배포 (선택)
+
+협업 기능을 프로덕션에서 사용하려면 PartyKit를 별도로 배포합니다:
+
+```bash
+npx partykit deploy
+```
+
+배포 후 받은 호스트 주소(예: `querypad-collab.username.partykit.dev`)를 앱 내 "Collaborate" 다이얼로그의 PartyKit Host 필드에 입력합니다.
+
+> PartyKit 무료 티어: 룸당 20 동시 접속, Cloudflare Workers 엣지 배포.
+> PartyKit을 배포하지 않아도 나머지 기능은 모두 정상 동작합니다.
+
+### 아키텍처: 서버 vs 클라이언트
+
+```
+Vercel (정적 서빙)                    사용자 브라우저 (모든 연산)
+┌─────────────────────┐              ┌──────────────────────────┐
+│ HTML/JS/CSS/WASM    │───다운로드──→│ DuckDB-Wasm (SQL 엔진)   │
+│ 서빙만 함            │              │ IndexedDB (데이터 저장)   │
+│                     │              │ Monaco Editor            │
+│ /api/ai/generate-sql│←─선택적───→ │ Zustand (상태 관리)       │
+│ (Anthropic 프록시)   │              │ @xyflow/react (DAG)      │
+└─────────────────────┘              └──────────────────────────┘
+
+PartyKit (선택)
+┌─────────────────────┐
+│ WebSocket 릴레이     │←─선택적───→ Y.js CRDT 동기화
+│ (Y.js 메시지 전달만)  │
+└─────────────────────┘
+```
+
+서버는 파일 서빙과 AI 프록시만 담당합니다. 사용자 데이터는 서버를 경유하지 않습니다.
 
 ### 기술 결정
 

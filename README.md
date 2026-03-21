@@ -2,20 +2,26 @@
 
 > **Drop a file. Query with SQL. Visualize and share. All in your browser.**
 
-**[Try it now](https://querypad.io)** | [Demo Video](https://querypad.io)
+**[Try it now](https://querypad.io)** | [GitHub](https://github.com/vericontext/querypad)
 
-<!-- TODO: Add demo GIF or screenshot here -->
-<!-- ![QueryPad Demo](demo.gif) -->
+https://github.com/vericontext/querypad/releases/download/v0.4.0/querypad-demo-4k.mp4
 
 A browser-native SQL playground powered by DuckDB-Wasm. Drag & drop CSV, Parquet, JSON, or Excel files — write SQL, visualize results, and share with a link. No server, no account, no install.
 
+## Why QueryPad?
+
+You have a CSV. You want to run a quick SQL query. You don't want to spin up a database, open a notebook, or install anything.
+
+QueryPad lets you drop files and start querying in seconds. Everything runs in your browser — your data never leaves your machine.
+
 ## Features
 
-- **File drag & drop** — Parquet, CSV, TSV, JSON, JSONL, NDJSON, Excel (.xlsx)
+- **Drag & drop anything** — CSV, Parquet, JSON, Excel — drop multiple formats at once and JOIN them
 - **DuckDB-Wasm SQL** — Full analytical SQL in the browser (JOIN, GROUP BY, window functions, etc.)
-- **Inline charts** — One-click Bar, Line, Scatter, Pie charts from query results (Recharts)
+- **Inline charts** — One-click Bar, Line, Scatter, Pie charts from query results
 - **URL sharing** — Compress data + query into a single shareable link
-- **AI SQL assistant** — Cmd+K for natural language → SQL (BYOK: bring your own Anthropic API key, runs entirely in browser)
+- **AI SQL assistant** — Cmd+K for natural language to SQL (BYOK: bring your own Anthropic API key, runs entirely in browser)
+- **Sample data on first visit** — Start exploring immediately, drop your own files when ready
 
 ### Advanced Features
 
@@ -28,6 +34,7 @@ A browser-native SQL playground powered by DuckDB-Wasm. Drag & drop CSV, Parquet
 - **Transform pipelines** — Chain queries with DAG visualization
 - **Plugin system** — Extend with visualizations, exporters, file loaders, SQL macros
 - **Real-time collaboration** — PartyKit + Y.js CRDT with remote cursors
+- **File size guardrails** — 100 MB per file limit with clear warnings
 
 ## Quick Start
 
@@ -52,6 +59,15 @@ Open `http://localhost:3000`. Sample data is automatically loaded on first visit
 | Collaboration | PartyKit + Y.js (optional) |
 
 ## Changelog
+
+### v0.4 — Onboarding & File Management
+
+- Sample data pre-loaded on first visit with welcome banner
+- Global drag-and-drop — drop files anywhere on the workspace
+- Add file modal with drag area, browse, and URL input
+- Per-table delete (hover X button in sidebar)
+- Auto-cleanup of sample data when user adds own files
+- File size validation (100 MB hard limit, 50 MB soft warning)
 
 ### v0.3 — Collaboration & Extensibility
 

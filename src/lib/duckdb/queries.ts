@@ -1,6 +1,6 @@
 import { getConnection } from "./instance";
 import type { QueryResult } from "@/types";
-import { DataType } from "apache-arrow";
+import { DataType, Decimal } from "apache-arrow";
 
 const MAX_ROWS = 10_000;
 
@@ -137,6 +137,9 @@ export async function executeQuery(sql: string): Promise<QueryResult> {
   // Build per-column type flags for fast lookup
   const dateFlags = schema.fields.map((f) => isDateType(f.type));
   const tsFlags = schema.fields.map((f) => isTimestampType(f.type));
+  const decimalScales = schema.fields.map((f) =>
+    DataType.isDecimal(f.type) ? (f.type as Decimal).scale : -1
+  );
 
   const allRows = result.toArray();
   const rows = allRows.slice(0, MAX_ROWS).map((row: Record<string, unknown>) => {
@@ -153,11 +156,13 @@ export async function executeQuery(sql: string): Promise<QueryResult> {
         val = Number(val);
       }
 
-      // Format date/timestamp types as ISO strings
+      // Format date/timestamp types as ISO strings, apply decimal scale
       if (dateFlags[i]) {
         obj[col] = formatDateValue(val);
       } else if (tsFlags[i]) {
         obj[col] = formatTimestampValue(val);
+      } else if (decimalScales[i] >= 0 && typeof val === "number") {
+        obj[col] = val / Math.pow(10, decimalScales[i]);
       } else {
         obj[col] = val;
       }

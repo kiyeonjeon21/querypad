@@ -1,7 +1,25 @@
 {
   "name": "querypad",
-  "version": "0.1.0",
+  "version": "0.5.0",
   "private": true,
+  "description": "Browser-native SQL playground powered by DuckDB-Wasm",
+  "author": "QueryPad Contributors",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vericontext/querypad.git"
+  },
+  "homepage": "https://querypad.io",
+  "keywords": [
+    "sql",
+    "duckdb",
+    "csv",
+    "parquet",
+    "json",
+    "analytics",
+    "data-analysis",
+    "browser"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -9,7 +27,9 @@
     "lint": "eslint",
     "partykit:dev": "partykit dev",
     "partykit:deploy": "partykit deploy",
-    "postinstall": "node scripts/copy-duckdb-wasm.mjs"
+    "postinstall": "node scripts/copy-duckdb-wasm.mjs",
+    "test": "playwright test",
+    "test:ui": "playwright test --ui"
   },
   "dependencies": {
     "@dagrejs/dagre": "^2.0.4",
@@ -32,6 +52,7 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
     "@types/dagre": "^0.7.54",
     "@types/node": "^20",

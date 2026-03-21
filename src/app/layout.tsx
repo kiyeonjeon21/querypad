@@ -16,9 +16,17 @@ export const metadata: Metadata = {
   title: "QueryPad — SQL Playground for Your Data Files",
   description:
     "Drop Parquet, CSV, or JSON files and query them with SQL in your browser. Share data + query in a single URL.",
+  metadataBase: new URL("https://querypad.io"),
   openGraph: {
     title: "QueryPad",
     description: "SQL playground for Parquet/CSV/JSON — powered by DuckDB-Wasm",
+    siteName: "QueryPad",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "QueryPad",
+    description: "Drop a file. Query with SQL. Visualize and share. All in your browser.",
   },
 };
 

@@ -15,7 +15,8 @@ function fromBase64Url(str: string): Uint8Array {
 
 export function decodeSharePayload(encoded: string): SharePayload {
   const compressed = fromBase64Url(encoded);
-  const json = pako.inflate(compressed, { to: "string" });
+  const copy = new Uint8Array(compressed);
+  const json = pako.inflate(copy, { to: "string" });
   return JSON.parse(json) as SharePayload;
 }
 

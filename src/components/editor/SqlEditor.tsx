@@ -30,6 +30,17 @@ export default function SqlEditor() {
   const bindingRef = useRef<any>(null);
   const [showAi, setShowAi] = useState(false);
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setShowAi((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
   const query = activeTab?.query ?? "";
   const isExecuting = activeTab?.isExecuting ?? false;
 

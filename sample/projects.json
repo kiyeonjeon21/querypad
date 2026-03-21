@@ -1,0 +1,8 @@
+[
+  {"project_id": "P1", "project_name": "Mobile App v2", "dept_id": "D1", "lead_emp_id": 1, "status": "active", "start_date": "2024-01-10"},
+  {"project_id": "P2", "project_name": "Brand Campaign", "dept_id": "D2", "lead_emp_id": 2, "status": "active", "start_date": "2024-02-01"},
+  {"project_id": "P3", "project_name": "Design System", "dept_id": "D3", "lead_emp_id": 4, "status": "completed", "start_date": "2023-09-15"},
+  {"project_id": "P4", "project_name": "Data Pipeline", "dept_id": "D1", "lead_emp_id": 3, "status": "active", "start_date": "2024-03-01"},
+  {"project_id": "P5", "project_name": "Q2 Sales Push", "dept_id": "D4", "lead_emp_id": 12, "status": "planning", "start_date": "2024-04-01"},
+  {"project_id": "P6", "project_name": "Homepage Redesign", "dept_id": "D3", "lead_emp_id": 7, "status": "active", "start_date": "2024-02-20"}
+]

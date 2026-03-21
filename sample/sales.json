@@ -1,0 +1,10 @@
+[
+  {"product": "Widget A", "region": "Seoul", "quantity": 150, "revenue": 4500.00, "month": "2024-01"},
+  {"product": "Widget B", "region": "Busan", "quantity": 80, "revenue": 3200.00, "month": "2024-01"},
+  {"product": "Widget A", "region": "Busan", "quantity": 120, "revenue": 3600.00, "month": "2024-02"},
+  {"product": "Widget C", "region": "Seoul", "quantity": 200, "revenue": 8000.00, "month": "2024-02"},
+  {"product": "Widget B", "region": "Seoul", "quantity": 95, "revenue": 3800.00, "month": "2024-03"},
+  {"product": "Widget A", "region": "Seoul", "quantity": 175, "revenue": 5250.00, "month": "2024-03"},
+  {"product": "Widget C", "region": "Busan", "quantity": 60, "revenue": 2400.00, "month": "2024-03"},
+  {"product": "Widget B", "region": "Busan", "quantity": 110, "revenue": 4400.00, "month": "2024-04"}
+]

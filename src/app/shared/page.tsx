@@ -40,8 +40,9 @@ function SharedLoader() {
           const dataB64 = payload.d[meta.name];
           if (!dataB64) continue;
           const buffer = decodeTableData(dataB64);
+          const bufferCopy = new Uint8Array(buffer);
           const table = await loadBufferAsTable(meta.name, meta.fileName, buffer);
-          addTable(table, meta.fileName, buffer);
+          addTable(table, meta.fileName, bufferCopy);
         }
 
         if (payload.q) updateTab(activeTabId, { query: payload.q });

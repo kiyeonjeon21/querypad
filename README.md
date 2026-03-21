@@ -260,6 +260,139 @@ Chrome은 2MB URL까지 지원하지만, 프록시/CDN/웹서버 기본값(8KB)�
 | **플러그인 시스템** | ✅ | ES 모듈 URL로 4가지 확장 (시각화, exporter, 파일 로더, SQL 매크로). IndexedDB 영속, ErrorBoundary 격리 |
 | **실시간 협업** | ✅ | PartyKit + Y.js CRDT. 쿼리 텍스트 (y-monaco), 탭, 파일(5MB 이하) 실시간 동기화. 원격 커서, graceful degradation |
 
+### Phase 4 — 배포 & 확장
+
+QueryPad의 핵심 가치는 "10초 만에 파일을 열어서 SQL을 돌리는 것"입니다. Phase 4는 이 가치를 더 많은 사용자와 AI 에이전트에게 전달하는 데 집중합니다.
+
+#### 배포 채널
+
+같은 코드베이스에서 4가지 채널로 배포합니다:
+
+```
+querypad (단일 코드베이스)
+├── querypad.app          → 웹: 누구나 브라우저에서 즉시 사용
+├── npx querypad          → CLI: 로컬 파일을 10초 만에 탐색
+├── querypad-mcp          → MCP: AI 에이전트가 데이터 분석 도구로 사용
+└── @querypad/core        → npm: 다른 앱에 임베드
+```
+
+| 채널 | 대상 | 사용 방법 | 상태 |
+|------|------|-----------|------|
+| **querypad.app** | 비개발자, 빠른 체험 | URL 접속 → 파일 드롭 → SQL | 계획 |
+| **`npx querypad`** | 개발자, 로컬 파일 | `npx querypad sales.csv` → 브라우저 자동 열림 | 계획 |
+| **MCP 서버** | AI 에이전트 | Claude Code / Cursor에서 데이터 분석 도구로 호출 | 계획 |
+| **npm 패키지** | 임베드 | `@querypad/core`로 다른 앱에 컴포넌트 삽입 | 계획 |
+
+#### `npx querypad` — Datasette 모델
+
+[Datasette](https://datasette.io)처럼 CLI가 로컬 서버를 시작하고 브라우저를 여는 모델입니다. DuckDB CLI와의 차별점은 CLI가 아니라 "파일을 넣으면 열리는 풀 UI"라는 점입니다.
+
+```bash
+# 설치 없이 실행
+npx querypad sales.csv departments.csv
+
+# → localhost:3847에서 QueryPad 실행
+# → 두 파일이 자동 로드된 상태
+# → Monaco 에디터, 차트, 내보내기, 파이프라인 모두 사용 가능
+```
+
+| 비교 | DuckDB CLI | Datasette | QueryPad CLI |
+|------|-----------|-----------|-------------|
+| 설치 | `brew install` | `pip install` | `npx` (설치 불필요) |
+| UI | 터미널 | 기본 웹 UI | 풀 IDE (Monaco + 차트 + DAG) |
+| 엔진 | DuckDB | SQLite | DuckDB-Wasm |
+| 파일 지원 | Parquet/CSV/JSON | SQLite DB | Parquet/CSV/JSON/Excel |
+| 시각화 | 없음 | 없음 | 차트 + DAG |
+
+```
+package.json 구조:
+{
+  "bin": {
+    "querypad": "./bin/querypad.js",
+    "querypad-mcp": "./bin/querypad-mcp.js"
+  }
+}
+```
+
+#### MCP 서버 — AI 에이전트를 위한 인터페이스
+
+[MCP (Model Context Protocol)](https://modelcontextprotocol.io)는 Anthropic이 만든 AI 에이전트 ↔ 도구 통신 표준입니다. Claude Code, Cursor 등에서 사용됩니다.
+
+기존 DuckDB MCP 서버(`duckdb-mcp`, `@seed-ship/duckdb-mcp-native`)는 SQL 실행만 제공합니다. QueryPad MCP는 **데이터 분석 워크플로우 전체**를 제공합니다:
+
+```jsonc
+// .mcp.json (Claude Code / Cursor에서)
+{
+  "mcpServers": {
+    "querypad": {
+      "command": "npx",
+      "args": ["querypad-mcp"]
+    }
+  }
+}
+```
+
+**MCP 도구 목록:**
+
+| 도구 | 설명 |
+|------|------|
+| `querypad.load_file` | 로컬 파일을 DuckDB에 로드 |
+| `querypad.query` | SQL 실행 → 구조화된 JSON 결과 반환 |
+| `querypad.describe` | 테이블 스키마 반환 (컬럼명, 타입, 행 수) |
+| `querypad.chart` | 쿼리 결과로 차트 생성 → 이미지/URL 반환 |
+| `querypad.export` | 결과를 CSV/JSON/Parquet 등으로 내보내기 |
+| `querypad.pipeline` | 파이프라인 실행 (멀티 스텝 SQL) |
+
+**AI 에이전트 사용 시나리오:**
+```
+사용자: "sales.csv를 분석해서 지역별 매출 추이 차트 만들어줘"
+
+Agent: querypad.load_file("./sales.csv")
+     → querypad.describe("sales")
+     → querypad.query("SELECT region, date, SUM(sales) ... GROUP BY region, date")
+     → querypad.chart({ type: "line", x: "date", y: "total_sales", color: "region" })
+     → "차트를 생성했습니다. [이미지]"
+```
+
+**에이전트 친화적 설계 원칙** ([참고](https://justin.poehnelt.com/posts/rewrite-your-cli-for-ai-agents/)):
+
+| 원칙 | 적용 |
+|------|------|
+| 구조화된 JSON 입출력 | 모든 MCP 도구가 typed JSON Schema로 정의 |
+| 런타임 스키마 조회 | `querypad.describe`로 테이블 구조를 에이전트 컨텍스트에 제공 |
+| 컨텍스트 윈도우 절약 | 결과 행 수 제한 (`--limit`), 컬럼 선택 (`--fields`) |
+| 입력 검증 | SQL injection 방지, 경로 검증 |
+| 안전 장치 | 읽기 전용 기본값, 파일 시스템 접근 범위 제한 |
+
+#### 경쟁 도구 배포 전략 비교
+
+| 도구 | 형태 | 배포 | CLI | MCP | 수익 모델 |
+|------|------|------|-----|-----|-----------|
+| **Excalidraw** | 브라우저 도구 | Vercel | ✗ | ✗ | Excalidraw+ (협업 유료) |
+| **Photopea** | 브라우저 도구 | 정적 CDN | ✗ | ✗ | 광고 ($1M+/년, 1인 개발) |
+| **StackBlitz** | 브라우저 IDE | 자체 인프라 | ✗ | ✗ | 프리미엄 SaaS |
+| **Datasette** | CLI → 웹 UI | PyPI + 클라우드 | ✓ | ✗ | 오픈소스 + 컨설팅 |
+| **Observable** | SaaS 노트북 | 자체 인프라 | ✓ | ✗ | 프리미엄 SaaS |
+| **DuckDB** | 엔진 | Homebrew/pip/npm | ✓ | 커뮤니티 | 오픈소스 + MotherDuck |
+| **QueryPad** | 브라우저 도구 + CLI + MCP | Vercel + npm | **계획** | **계획** | 오픈소스 |
+
+> **핵심 인사이트:** 브라우저 네이티브 도구 중 CLI + MCP를 모두 제공하는 사례는 아직 없습니다. QueryPad가 이 조합을 처음 실현하면 "인간을 위한 UI + AI를 위한 API"를 하나의 도구에서 제공하는 최초 사례가 됩니다.
+
+#### QueryPad는 SaaS가 아닙니다
+
+QueryPad는 **브라우저 네이티브 도구**입니다. Vercel에 배포해도 본질은 바뀌지 않습니다.
+
+```
+SaaS (서버 의존)                     브라우저 네이티브 도구 (QueryPad)
+─────────────────                    ───────────────────────────────
+데이터가 서버에 저장                    데이터가 브라우저에만 존재
+서버 죽으면 서비스 불가                  서버는 HTML/JS 내려주기만
+계정 필요, 로그인 필요                  계정 없음, 열면 바로 사용
+서버 비용이 사용자 수에 비례              사용자 늘어도 비용 거의 동일
+```
+
+Excalidraw, Photopea, TypeScript Playground와 같은 모델입니다. 서버는 정적 파일을 내려줄 뿐, 모든 연산과 저장은 사용자 브라우저에서 이루어집니다.
+
 ## 배포
 
 ### Vercel 배포 (권장)

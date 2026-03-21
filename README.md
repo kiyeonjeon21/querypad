@@ -64,6 +64,13 @@ Open `http://localhost:3000`. Sample data is automatically loaded on first visit
 
 ## Changelog
 
+### v0.6 — Open-Source Release
+
+- Vercel Analytics integration
+- OG image and Twitter card metadata for social sharing
+- Playwright e2e test suite
+- CONTRIBUTING.md and project metadata
+
 ### v0.5 — Query Engine Fixes
 
 - DATE and TIMESTAMP columns now display as human-readable ISO strings instead of raw epoch milliseconds

@@ -4,7 +4,7 @@
 
 **[Try it now](https://querypad.io)** | [GitHub](https://github.com/vericontext/querypad)
 
-https://github.com/vericontext/querypad/releases/download/v0.4.0/querypad-demo-4k.mp4
+https://github.com/user-attachments/assets/5fa069e0-aaa2-4cc1-9735-df93b840f44d
 
 A browser-native SQL playground powered by DuckDB-Wasm. Drag & drop CSV, Parquet, JSON, or Excel files — write SQL, visualize results, and share with a link. No server, no account, no install.
 

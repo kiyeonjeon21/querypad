@@ -1,0 +1,5 @@
+dept_id,dept_name,budget,manager_id
+D1,Engineering,500000,3
+D2,Marketing,300000,2
+D3,Design,250000,10
+D4,Sales,350000,12

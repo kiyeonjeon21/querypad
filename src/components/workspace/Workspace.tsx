@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
 import { getDB } from "@/lib/duckdb/instance";
+import { loadBufferAsTable } from "@/lib/duckdb/files";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useCollaborationStore } from "@/stores/collaboration-store";
 import { connectToRoom } from "@/lib/collaboration/sync";
@@ -49,8 +50,14 @@ export default function Workspace() {
   const pathname = usePathname();
   const isSharedPage = pathname === "/shared";
 
+  const addTable = useWorkspaceStore((s) => s.addTable);
+  const updateTab = useWorkspaceStore((s) => s.updateTab);
+  const activeTabId = useWorkspaceStore((s) => s.activeTabId);
+
   const [showPluginManager, setShowPluginManager] = useState(false);
   const [showJoinDialog, setShowJoinDialog] = useState(false);
+  const [preloading, setPreloading] = useState(false);
+  const preloadAttempted = useRef(false);
 
   useEffect(() => {
     getDB()
@@ -63,6 +70,45 @@ export default function Workspace() {
       restoreFromIndexedDB();
     }
   }, [dbReady, _hydrated, isSharedPage, restoreFromIndexedDB]);
+
+  // Preload sample data for first-time visitors
+  useEffect(() => {
+    if (!dbReady || !_hydrated || tables.length > 0 || isSharedPage || preloadAttempted.current) return;
+    preloadAttempted.current = true;
+
+    const preload = async () => {
+      setPreloading(true);
+      try {
+        const [empRes, deptRes] = await Promise.all([
+          fetch("/sample/employees.csv"),
+          fetch("/sample/departments.csv"),
+        ]);
+        const [empBuf, deptBuf] = await Promise.all([
+          empRes.arrayBuffer().then((ab) => new Uint8Array(ab)),
+          deptRes.arrayBuffer().then((ab) => new Uint8Array(ab)),
+        ]);
+
+        const empTable = await loadBufferAsTable("employees", "employees.csv", empBuf);
+        addTable(empTable, "employees.csv", empBuf);
+
+        const deptTable = await loadBufferAsTable("departments", "departments.csv", deptBuf);
+        addTable(deptTable, "departments.csv", deptBuf);
+
+        // Prefill example query in active tab
+        const sampleQuery = `SELECT d.dept_name, COUNT(*) as headcount, ROUND(AVG(e.salary)) as avg_salary
+FROM employees e
+JOIN departments d ON e.dept_id = d.dept_id
+GROUP BY d.dept_name`;
+        updateTab(activeTabId, { query: sampleQuery });
+      } catch (err) {
+        console.error("Failed to preload sample data:", err);
+      } finally {
+        setPreloading(false);
+      }
+    };
+
+    preload();
+  }, [dbReady, _hydrated, tables.length, isSharedPage, addTable, updateTab, activeTabId]);
 
   const handleCreateRoom = useCallback(
     async (host: string) => {
@@ -114,6 +160,16 @@ export default function Workspace() {
   }
 
   if (tables.length === 0) {
+    if (preloading) {
+      return (
+        <div className="flex items-center justify-center h-screen bg-white">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm text-gray-500">Loading sample data...</p>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="flex flex-col h-screen bg-white">
         <header className="flex items-center justify-between px-4 py-3 border-b border-gray-200">

@@ -50,6 +50,7 @@ yarn-error.log*
 FEEDBACK.md
 ROADMAP-PHASE4.md
 DEMO.md
+docs/SHOW-HN.md
 
 # typescript
 *.tsbuildinfo

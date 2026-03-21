@@ -1,0 +1,13 @@
+emp_id,name,dept_id,salary,hire_date
+1,Alice Kim,D1,95000,2021-03-15
+2,Bob Park,D2,72000,2020-07-01
+3,Charlie Lee,D1,105000,2019-11-20
+4,Diana Choi,D3,82000,2022-01-10
+5,Eve Jung,D2,68000,2023-06-05
+6,Frank Oh,D1,112000,2018-09-12
+7,Grace Han,D3,78000,2021-08-23
+8,Henry Yoo,D2,75000,2020-02-14
+9,Ivy Shin,D1,98000,2022-04-30
+10,Jack Lim,D3,85000,2019-12-01
+11,Kate Ryu,D4,77000,2021-05-18
+12,Leo Baek,D4,91000,2020-10-07

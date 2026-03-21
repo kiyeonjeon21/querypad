@@ -10,6 +10,10 @@ export function sanitizeTableName(fileName: string): string {
 
 export function formatValue(val: unknown): string {
   if (val === null || val === undefined) return "NULL";
+  if (typeof val === "number") {
+    if (Number.isInteger(val)) return String(val);
+    return parseFloat(val.toPrecision(15)).toString();
+  }
   if (typeof val === "object") return JSON.stringify(val);
   return String(val);
 }

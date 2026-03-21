@@ -5,6 +5,7 @@ import { loadFileAsTable } from "@/lib/duckdb/files";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useCollaborationStore } from "@/stores/collaboration-store";
 import { broadcastFile } from "@/lib/collaboration/file-sync";
+import { checkFileSize } from "@/lib/constants";
 import UrlInput from "./UrlInput";
 
 const ACCEPTED_EXTENSIONS = [".parquet", ".csv", ".tsv", ".json", ".jsonl", ".ndjson", ".xlsx"];
@@ -18,17 +19,30 @@ interface DropZoneProps {
 export default function DropZone({ compact, highlight, onFilesAdded }: DropZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [sizeAlert, setSizeAlert] = useState<{ type: "error" | "warning"; message: string } | null>(null);
   const addTable = useWorkspaceStore((s) => s.addTable);
   const roomId = useCollaborationStore((s) => s.roomId);
 
   const handleFiles = useCallback(
     async (files: FileList | File[]) => {
       setIsLoading(true);
+      setSizeAlert(null);
       let addedAny = false;
       try {
         for (const file of Array.from(files)) {
           const ext = "." + file.name.split(".").pop()?.toLowerCase();
           if (!ACCEPTED_EXTENSIONS.includes(ext)) continue;
+
+          // File size check
+          const sizeCheck = checkFileSize(file);
+          if (sizeCheck?.type === "error") {
+            setSizeAlert(sizeCheck);
+            continue;
+          }
+          if (sizeCheck?.type === "warning") {
+            setSizeAlert(sizeCheck);
+          }
+
           const data = new Uint8Array(await file.arrayBuffer());
           const table = await loadFileAsTable(file);
           addTable(table, file.name, data);
@@ -156,10 +170,21 @@ export default function DropZone({ compact, highlight, onFilesAdded }: DropZoneP
                       </div>
                     )}
                   </div>
+                  {sizeAlert && (
+                    <div className={`flex items-start gap-2 px-3 py-2 rounded-lg text-sm ${
+                      sizeAlert.type === "error"
+                        ? "bg-red-50 text-red-700"
+                        : "bg-amber-50 text-amber-700"
+                    }`}>
+                      <span className="shrink-0 mt-0.5">{sizeAlert.type === "error" ? "⚠" : "⚡"}</span>
+                      <span>{sizeAlert.message}</span>
+                    </div>
+                  )}
                   <div className="text-center">
                     <p className="text-xs text-gray-400 mb-2">or paste a URL</p>
                     <UrlInput />
                   </div>
+                  <p className="text-xs text-gray-400 text-center">Max file size: 100 MB per file</p>
                 </div>
               </div>
             </div>
@@ -214,10 +239,21 @@ export default function DropZone({ compact, highlight, onFilesAdded }: DropZoneP
           </div>
         )}
       </div>
+      {sizeAlert && (
+        <div className={`flex items-start gap-2 px-3 py-2 rounded-lg text-sm ${
+          sizeAlert.type === "error"
+            ? "bg-red-50 text-red-700"
+            : "bg-amber-50 text-amber-700"
+        }`}>
+          <span className="shrink-0 mt-0.5">{sizeAlert.type === "error" ? "⚠" : "⚡"}</span>
+          <span>{sizeAlert.message}</span>
+        </div>
+      )}
       <div className="text-center">
         <p className="text-xs text-gray-400 mb-2">or paste a URL</p>
         <UrlInput />
       </div>
+      <p className="text-xs text-gray-400 text-center">Max file size: 100 MB per file</p>
     </div>
   );
 }

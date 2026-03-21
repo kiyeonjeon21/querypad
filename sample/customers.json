@@ -1,0 +1,10 @@
+[
+  {"customer_id": "C01", "name": "Alice Kim", "region": "Asia", "signup_date": "2023-03-12"},
+  {"customer_id": "C02", "name": "Bob Smith", "region": "North America", "signup_date": "2023-05-20"},
+  {"customer_id": "C03", "name": "Carlos Ruiz", "region": "Europe", "signup_date": "2023-07-08"},
+  {"customer_id": "C04", "name": "Diana Chen", "region": "Asia", "signup_date": "2023-09-15"},
+  {"customer_id": "C05", "name": "Emma Wilson", "region": "North America", "signup_date": "2024-01-10"},
+  {"customer_id": "C06", "name": "Felix Müller", "region": "Europe", "signup_date": "2024-02-28"},
+  {"customer_id": "C07", "name": "Grace Park", "region": "Asia", "signup_date": "2024-04-05"},
+  {"customer_id": "C08", "name": "Hugo Silva", "region": "South America", "signup_date": "2024-06-18"}
+]

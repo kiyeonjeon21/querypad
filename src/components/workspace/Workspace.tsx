@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
 import { getDB } from "@/lib/duckdb/instance";
-import { SAMPLE_TABLE_NAMES } from "@/lib/constants";
+import { SAMPLE_TABLE_NAMES, checkFileSize } from "@/lib/constants";
 import { loadBufferAsTable, loadFileAsTable } from "@/lib/duckdb/files";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useCollaborationStore } from "@/stores/collaboration-store";
@@ -60,6 +60,7 @@ export default function Workspace() {
   const [showJoinDialog, setShowJoinDialog] = useState(false);
   const [preloading, setPreloading] = useState(false);
   const preloadAttempted = useRef(false);
+  const [fileSizeAlert, setFileSizeAlert] = useState<{ type: "error" | "warning"; message: string } | null>(null);
 
   // Global drag-and-drop overlay
   const [showDropOverlay, setShowDropOverlay] = useState(false);
@@ -159,6 +160,7 @@ GROUP BY d.dept_name`;
       e.preventDefault();
       dragCounter.current = 0;
       setShowDropOverlay(false);
+      setFileSizeAlert(null);
       const files = e.dataTransfer?.files;
       if (!files?.length) return;
       const ACCEPTED = [".parquet", ".csv", ".tsv", ".json", ".jsonl", ".ndjson", ".xlsx"];
@@ -167,6 +169,16 @@ GROUP BY d.dept_name`;
       for (const file of Array.from(files)) {
         const ext = "." + file.name.split(".").pop()?.toLowerCase();
         if (!ACCEPTED.includes(ext)) continue;
+
+        const sizeCheck = checkFileSize(file);
+        if (sizeCheck?.type === "error") {
+          setFileSizeAlert(sizeCheck);
+          continue;
+        }
+        if (sizeCheck?.type === "warning") {
+          setFileSizeAlert(sizeCheck);
+        }
+
         try {
           const data = new Uint8Array(await file.arrayBuffer());
           const table = await loadFileAsTable(file);
@@ -418,6 +430,28 @@ GROUP BY d.dept_name`;
       {/* Global drop indicator — subtle border highlight */}
       {showDropOverlay && (
         <div className="fixed inset-0 z-50 pointer-events-none border-3 border-blue-400 rounded-lg m-1 transition-opacity" />
+      )}
+
+      {/* File size alert toast */}
+      {fileSizeAlert && (
+        <div className="fixed bottom-4 right-4 z-50 max-w-sm animate-in fade-in slide-in-from-bottom-2">
+          <div className={`flex items-start gap-2 px-4 py-3 rounded-lg shadow-lg text-sm ${
+            fileSizeAlert.type === "error"
+              ? "bg-red-50 text-red-700 border border-red-200"
+              : "bg-amber-50 text-amber-700 border border-amber-200"
+          }`}>
+            <span className="shrink-0 mt-0.5">{fileSizeAlert.type === "error" ? "⚠" : "⚡"}</span>
+            <span className="flex-1">{fileSizeAlert.message}</span>
+            <button
+              onClick={() => setFileSizeAlert(null)}
+              className="shrink-0 p-0.5 hover:opacity-70"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Modals */}

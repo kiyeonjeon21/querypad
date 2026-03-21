@@ -116,3 +116,7 @@ Contributions are welcome! Feel free to open issues and pull requests.
 ## License
 
 MIT
+
+---
+
+Built by [@vericontext](https://x.com/vericontext)

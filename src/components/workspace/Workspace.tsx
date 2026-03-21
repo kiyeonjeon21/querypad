@@ -88,11 +88,15 @@ export default function Workspace() {
           deptRes.arrayBuffer().then((ab) => new Uint8Array(ab)),
         ]);
 
+        // Copy buffers before loadBufferAsTable — DuckDB's registerFileBuffer detaches the original
+        const empBufCopy = new Uint8Array(empBuf);
+        const deptBufCopy = new Uint8Array(deptBuf);
+
         const empTable = await loadBufferAsTable("employees", "employees.csv", empBuf);
-        addTable(empTable, "employees.csv", empBuf);
+        addTable(empTable, "employees.csv", empBufCopy);
 
         const deptTable = await loadBufferAsTable("departments", "departments.csv", deptBuf);
-        addTable(deptTable, "departments.csv", deptBuf);
+        addTable(deptTable, "departments.csv", deptBufCopy);
 
         // Prefill example query in active tab
         const sampleQuery = `SELECT d.dept_name, COUNT(*) as headcount, ROUND(AVG(e.salary)) as avg_salary

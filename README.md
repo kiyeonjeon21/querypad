@@ -64,6 +64,13 @@ Open `http://localhost:3000`. Sample data is automatically loaded on first visit
 
 ## Changelog
 
+### v0.5 — Query Engine Fixes
+
+- DATE and TIMESTAMP columns now display as human-readable ISO strings instead of raw epoch milliseconds
+- Multi-statement SQL support — semicolon-separated queries execute sequentially, last result displayed
+- Share URL v2 binary format — eliminates double base64 encoding, supports larger datasets reliably
+- Backward-compatible decoding for existing v1 share links
+
 ### v0.4 — Onboarding & File Management
 
 - Sample data pre-loaded on first visit with welcome banner

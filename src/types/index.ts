@@ -11,6 +11,7 @@ export interface TableInfo {
 
 export interface QueryResult {
   columns: string[];
+  columnTypes: string[];
   rows: Record<string, unknown>[];
   rowCount: number;
   executionTimeMs: number;

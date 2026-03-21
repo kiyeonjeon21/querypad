@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { getDB } from "@/lib/duckdb/instance";
-import { decodeSharePayload, decodeTableData } from "@/lib/sharing/decode";
+import { decodeShare } from "@/lib/sharing/decode";
 import { loadBufferAsTable } from "@/lib/duckdb/files";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
@@ -34,18 +34,15 @@ function SharedLoader() {
         await getDB();
         setDbReady(true);
 
-        const payload = decodeSharePayload(encoded);
+        const shared = decodeShare(encoded);
 
-        for (const meta of payload.t) {
-          const dataB64 = payload.d[meta.name];
-          if (!dataB64) continue;
-          const buffer = decodeTableData(dataB64);
-          const bufferCopy = new Uint8Array(buffer);
-          const table = await loadBufferAsTable(meta.name, meta.fileName, buffer);
-          addTable(table, meta.fileName, bufferCopy);
+        for (const entry of shared.tables) {
+          const bufferCopy = new Uint8Array(entry.data);
+          const table = await loadBufferAsTable(entry.name, entry.fileName, entry.data);
+          addTable(table, entry.fileName, bufferCopy);
         }
 
-        if (payload.q) updateTab(activeTabId, { query: payload.q });
+        if (shared.query) updateTab(activeTabId, { query: shared.query });
         setLoading(false);
       } catch (err) {
         console.error("Failed to load shared data:", err);

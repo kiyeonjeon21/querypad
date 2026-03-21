@@ -67,6 +67,7 @@ Open `http://localhost:3000`. Sample data is automatically loaded on first visit
 ### v0.5 — Query Engine Fixes
 
 - DATE and TIMESTAMP columns now display as human-readable ISO strings instead of raw epoch milliseconds
+- DECIMAL values now display correctly with proper scale (e.g. `0.3` instead of `3`)
 - Multi-statement SQL support — semicolon-separated queries execute sequentially, last result displayed
 - Share URL v2 binary format — eliminates double base64 encoding, supports larger datasets reliably
 - Backward-compatible decoding for existing v1 share links

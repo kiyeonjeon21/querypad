@@ -64,6 +64,9 @@ Open `http://localhost:3000`. Sample data is automatically loaded on first visit
 
 ## Changelog
 
+QueryPad is a web app, not an npm package. Version numbers here mark GitHub
+release milestones and public product updates.
+
 ### v0.6 — Open-Source Release
 
 - Vercel Analytics integration

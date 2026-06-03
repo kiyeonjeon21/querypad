@@ -1,6 +1,6 @@
 {
   "name": "querypad",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "description": "Browser-native SQL playground powered by DuckDB-Wasm",
   "author": "QueryPad Contributors",
@@ -25,6 +25,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "check:version": "node scripts/check-version.mjs",
+    "check": "npm run check:version && npm run lint && npm run typecheck && npm run build",
+    "version": "npm run check:version",
     "partykit:dev": "partykit dev",
     "partykit:deploy": "partykit deploy",
     "postinstall": "node scripts/copy-duckdb-wasm.mjs",

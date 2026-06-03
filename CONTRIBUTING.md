@@ -29,15 +29,17 @@ src/
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feat/my-feature`)
 3. Make your changes
-4. Run the linter (`npm run lint`)
-5. Commit your changes
-6. Push to your fork and open a Pull Request
+4. Run the local checks (`npm run check`)
+5. Run the e2e tests (`npm test`)
+6. Commit your changes
+7. Push to your fork and open a Pull Request
 
 ## Guidelines
 
 - Keep PRs focused — one feature or fix per PR
 - Follow existing code style and conventions
 - Test your changes locally before submitting
+- Keep `package.json`, `package-lock.json`, and the latest README changelog version in sync
 
 ## Reporting Issues
 

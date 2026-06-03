@@ -28,6 +28,7 @@ export default function SqlEditor() {
   const editorRef = useRef<unknown>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const bindingRef = useRef<any>(null);
+  const queryRef = useRef("");
   const [showAi, setShowAi] = useState(false);
 
   useEffect(() => {
@@ -43,6 +44,10 @@ export default function SqlEditor() {
 
   const query = activeTab?.query ?? "";
   const isExecuting = activeTab?.isExecuting ?? false;
+
+  useEffect(() => {
+    queryRef.current = query;
+  }, [query]);
 
   const runQuery = useCallback(async () => {
     const q = query.trim();
@@ -80,8 +85,8 @@ export default function SqlEditor() {
         if (!yText || !awareness) return;
 
         // Initialize Y.Text with current query if empty
-        if (yText.length === 0 && query) {
-          yText.insert(0, query);
+        if (yText.length === 0 && queryRef.current) {
+          yText.insert(0, queryRef.current);
         }
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

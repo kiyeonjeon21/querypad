@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { getDB } from "@/lib/duckdb/instance";
@@ -14,6 +15,7 @@ const Workspace = dynamic(() => import("@/components/workspace/Workspace"), {
 
 function SharedLoader() {
   const searchParams = useSearchParams();
+  const encoded = searchParams.get("s");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const addTable = useWorkspaceStore((s) => s.addTable);
@@ -22,12 +24,7 @@ function SharedLoader() {
   const setDbReady = useWorkspaceStore((s) => s.setDbReady);
 
   useEffect(() => {
-    const encoded = searchParams.get("s");
-    if (!encoded) {
-      setError("No shared data found in URL");
-      setLoading(false);
-      return;
-    }
+    if (!encoded) return;
 
     (async () => {
       try {
@@ -50,7 +47,21 @@ function SharedLoader() {
         setLoading(false);
       }
     })();
-  }, [searchParams, addTable, updateTab, activeTabId, setDbReady]);
+  }, [encoded, addTable, updateTab, activeTabId, setDbReady]);
+
+  if (!encoded) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-white">
+        <div className="text-center">
+          <p className="text-red-600 font-medium">Failed to load shared data</p>
+          <p className="text-sm text-gray-500 mt-1">No shared data found in URL</p>
+          <Link href="/" className="text-sm text-blue-600 hover:underline mt-4 inline-block">
+            Go to QueryPad
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   if (error) {
     return (
@@ -58,9 +69,9 @@ function SharedLoader() {
         <div className="text-center">
           <p className="text-red-600 font-medium">Failed to load shared data</p>
           <p className="text-sm text-gray-500 mt-1">{error}</p>
-          <a href="/" className="text-sm text-blue-600 hover:underline mt-4 inline-block">
+          <Link href="/" className="text-sm text-blue-600 hover:underline mt-4 inline-block">
             Go to QueryPad
-          </a>
+          </Link>
         </div>
       </div>
     );

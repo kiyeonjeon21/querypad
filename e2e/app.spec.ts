@@ -23,7 +23,7 @@ test.describe("QueryPad", () => {
 
     // Results table should appear with data rows
     await expect(page.getByText("dept_name", { exact: true }).first()).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText("avg_salary", { exact: true })).toBeVisible();
+    await expect(page.getByText("avg_salary", { exact: true }).last()).toBeVisible();
   });
 
   test("can switch between SQL and Pipeline mode", async ({ page }) => {

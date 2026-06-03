@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import DataTable from "./DataTable";
@@ -23,8 +23,27 @@ export default function ResultsPanel() {
   const error = activeTab?.error ?? null;
   const isExecuting = activeTab?.isExecuting ?? false;
 
-  const [viewTab, setViewTab] = useState<Tab>("table");
-  const [chartConfig, setChartConfig] = useState<ChartConfig | null>(null);
+  const [selectedView, setSelectedView] = useState<{
+    result: typeof result;
+    tab: Tab;
+  }>({ result: null, tab: "table" });
+  const [chartConfigEdit, setChartConfigEdit] = useState<{
+    result: typeof result;
+    config: ChartConfig;
+  } | null>(null);
+
+  const detectedChartConfig = useMemo(
+    () => (result ? detectChartConfig(result) : null),
+    [result]
+  );
+  const chartConfig =
+    chartConfigEdit?.result === result
+      ? chartConfigEdit.config
+      : detectedChartConfig;
+  const viewTab = selectedView.result === result ? selectedView.tab : "table";
+  const setViewTab = (tab: Tab) => setSelectedView({ result, tab });
+  const setChartConfig = (config: ChartConfig) =>
+    setChartConfigEdit({ result, config });
 
   // Collect plugin visualizations
   const pluginVizTabs = plugins.flatMap((p) =>
@@ -37,16 +56,6 @@ export default function ResultsPanel() {
         extension: ext as Extract<typeof ext, { type: "visualization" }>,
       }))
   );
-
-  useEffect(() => {
-    if (result) {
-      const detected = detectChartConfig(result);
-      setChartConfig(detected);
-      setViewTab("table");
-    } else {
-      setChartConfig(null);
-    }
-  }, [result]);
 
   if (isExecuting) {
     return (

@@ -10,12 +10,12 @@ const ROW_HEIGHT = 32;
 export default function DataTable({ result }: { result: QueryResult }) {
   const parentRef = useRef<HTMLDivElement>(null);
 
-  const colCount = result.columns.length + 1; // +1 for row number
   const gridCols = useMemo(
     () => `48px repeat(${result.columns.length}, minmax(100px, 1fr))`,
     [result.columns.length]
   );
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const rowVirtualizer = useVirtualizer({
     count: result.rows.length,
     getScrollElement: () => parentRef.current,

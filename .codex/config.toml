@@ -1,0 +1,7 @@
+[[hooks.Stop]]
+
+[[hooks.Stop.hooks]]
+type = "command"
+command = 'node "$(git rev-parse --show-toplevel)/scripts/check-version.mjs"'
+timeout = 10
+statusMessage = "Checking QueryPad version metadata"

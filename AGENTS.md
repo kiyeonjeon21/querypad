@@ -6,6 +6,6 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## Release and verification
 
-- Keep `package.json`, `package-lock.json`, and the latest README changelog version in sync.
+- Keep `package.json`, `package-lock.json`, and the latest `CHANGELOG.md` release version in sync.
 - Run `npm run check` after code/config changes, and `npm test` when UI behavior or e2e-covered flows change.
 - Do not commit demo video artifacts; use them as release/README upload assets.

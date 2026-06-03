@@ -39,7 +39,7 @@ src/
 - Keep PRs focused — one feature or fix per PR
 - Follow existing code style and conventions
 - Test your changes locally before submitting
-- Keep `package.json`, `package-lock.json`, and the latest README changelog version in sync
+- Keep `package.json`, `package-lock.json`, and the latest `CHANGELOG.md` release version in sync
 
 ## Reporting Issues
 

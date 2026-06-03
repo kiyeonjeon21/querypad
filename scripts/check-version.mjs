@@ -21,12 +21,12 @@ function fail(message) {
 
 const packageJson = readJson("package.json");
 const packageLock = readJson("package-lock.json");
-const readme = readFileSync(join(root, "README.md"), "utf8");
+const changelog = readFileSync(join(root, "CHANGELOG.md"), "utf8");
 
 const packageVersion = normalizeVersion(packageJson.version);
 const lockVersion = normalizeVersion(packageLock.version);
 const lockRootVersion = normalizeVersion(packageLock.packages?.[""]?.version ?? "");
-const changelogMatch = readme.match(/^### v(\d+\.\d+(?:\.\d+)?)\b/m);
+const changelogMatch = changelog.match(/^## v(\d+\.\d+(?:\.\d+)?)\b/m);
 const changelogVersion = changelogMatch
   ? normalizeVersion(changelogMatch[1])
   : null;
@@ -40,9 +40,9 @@ if (packageVersion !== lockRootVersion) {
 }
 
 if (!changelogVersion) {
-  fail("README.md does not contain a changelog heading like `### v0.6`.");
+  fail("CHANGELOG.md does not contain a release heading like `## v0.6`.");
 } else if (packageVersion !== changelogVersion) {
-  fail(`package.json (${packageVersion}) and README latest changelog (${changelogVersion}) differ.`);
+  fail(`package.json (${packageVersion}) and CHANGELOG latest release (${changelogVersion}) differ.`);
 }
 
 if (!process.exitCode) {

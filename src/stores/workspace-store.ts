@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { TableInfo, EditorTab } from "@/types";
+import type { TableInfo, EditorTab, TableProfileState } from "@/types";
 import type { Pipeline, PipelineStep, PipelineExecutionResult } from "@/types/pipeline";
 import type { LoadedPlugin } from "@/types/plugin";
 import {
@@ -43,8 +43,11 @@ interface WorkspaceState {
   // Tables
   tables: TableInfo[];
   fileEntries: FileEntry[];
+  tableProfiles: Record<string, TableProfileState>;
   addTable: (table: TableInfo, fileName: string, data: Uint8Array) => void;
   removeTable: (name: string) => void;
+  loadTableProfile: (name: string) => Promise<void>;
+  clearTableProfile: (name: string) => void;
 
   // Clear
   clearWorkspace: () => Promise<void>;
@@ -168,6 +171,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
   tables: [],
   fileEntries: [],
+  tableProfiles: {},
   addTable: (table, fileName, data) =>
     set((state) => ({
       tables: [...state.tables.filter((t) => t.name !== table.name), table],
@@ -175,11 +179,18 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         ...state.fileEntries.filter((f) => f.name !== table.name),
         { name: table.name, fileName, data: new Uint8Array(data) },
       ],
+      tableProfiles: {
+        ...state.tableProfiles,
+        [table.name]: { status: "idle", profile: null, error: null },
+      },
     })),
   removeTable: async (name) => {
     set((state) => ({
       tables: state.tables.filter((t) => t.name !== name),
       fileEntries: state.fileEntries.filter((f) => f.name !== name),
+      tableProfiles: Object.fromEntries(
+        Object.entries(state.tableProfiles).filter(([tableName]) => tableName !== name)
+      ),
     }));
     try {
       const conn = await getConnection();
@@ -205,11 +216,58 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     set({
       tables: [],
       fileEntries: [],
+      tableProfiles: {},
       tabs: [tab],
       activeTabId: tab.id,
       shareUrl: null,
     });
   },
+
+  loadTableProfile: async (name) => {
+    const table = get().tables.find((t) => t.name === name);
+    if (!table) return;
+
+    const current = get().tableProfiles[name];
+    if (current?.status === "loading") return;
+
+    set((state) => ({
+      tableProfiles: {
+        ...state.tableProfiles,
+        [name]: { status: "loading", profile: current?.profile ?? null, error: null },
+      },
+    }));
+
+    try {
+      const { profileTable } = await import("@/lib/duckdb/profile");
+      const profile = await profileTable(table);
+      if (!get().tables.some((t) => t.name === name)) return;
+      set((state) => ({
+        tableProfiles: {
+          ...state.tableProfiles,
+          [name]: { status: "ready", profile, error: null },
+        },
+      }));
+    } catch (err) {
+      if (!get().tables.some((t) => t.name === name)) return;
+      set((state) => ({
+        tableProfiles: {
+          ...state.tableProfiles,
+          [name]: {
+            status: "error",
+            profile: null,
+            error: err instanceof Error ? err.message : String(err),
+          },
+        },
+      }));
+    }
+  },
+
+  clearTableProfile: (name) =>
+    set((state) => ({
+      tableProfiles: Object.fromEntries(
+        Object.entries(state.tableProfiles).filter(([tableName]) => tableName !== name)
+      ),
+    })),
 
   tabs: [initialTab],
   activeTabId: initialTab.id,

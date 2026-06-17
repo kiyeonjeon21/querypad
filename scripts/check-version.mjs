@@ -15,10 +15,11 @@ function normalizeVersion(version) {
 }
 
 function fail(message) {
-  console.error(`Version check failed: ${message}`);
+  failures.push(message);
   process.exitCode = 1;
 }
 
+const failures = [];
 const packageJson = readJson("package.json");
 const packageLock = readJson("package-lock.json");
 const changelog = readFileSync(join(root, "CHANGELOG.md"), "utf8");
@@ -45,6 +46,30 @@ if (!changelogVersion) {
   fail(`package.json (${packageVersion}) and CHANGELOG latest release (${changelogVersion}) differ.`);
 }
 
-if (!process.exitCode) {
+const humanOutput =
+  process.argv.includes("--human") ||
+  process.env.npm_lifecycle_event === "check:version";
+
+if (humanOutput) {
+  for (const failure of failures) {
+    console.error(`Version check failed: ${failure}`);
+  }
+}
+
+if (failures.length === 0 && humanOutput) {
   console.log(`Version metadata is consistent at v${packageVersion}.`);
+}
+
+if (!humanOutput) {
+  if (failures.length === 0) {
+    console.log(JSON.stringify({ continue: true }));
+  } else {
+    console.log(
+      JSON.stringify({
+        decision: "block",
+        reason: failures.map((failure) => `Version check failed: ${failure}`).join("\n"),
+      })
+    );
+  }
+  process.exitCode = 0;
 }

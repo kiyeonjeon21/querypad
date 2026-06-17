@@ -18,6 +18,7 @@ import ShareButton from "@/components/share/ShareButton";
 import DropZone from "@/components/dropzone/DropZone";
 import RoomBar from "@/components/collaboration/RoomBar";
 import JoinDialog from "@/components/collaboration/JoinDialog";
+import CopyAgentContextButton from "./CopyAgentContextButton";
 
 const PipelineEditor = dynamic(
   () => import("@/components/pipeline/PipelineEditor"),
@@ -356,6 +357,7 @@ GROUP BY d.dept_name`;
           >
             Clear
           </button>
+          <CopyAgentContextButton />
           <ShareButton />
           <a
             href="https://github.com/vericontext/querypad"

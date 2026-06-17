@@ -1,0 +1,11 @@
+id,user_id,event_type
+1,1,login
+2,2,login
+3,1,view
+4,3,login
+5,4,view
+6,5,login
+7,2,purchase
+8,3,view
+9,5,purchase
+10,1,logout

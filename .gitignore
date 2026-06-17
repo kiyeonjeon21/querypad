@@ -36,6 +36,9 @@ yarn-error.log*
 # generated wasm files
 /public/duckdb/
 
+# querypad CLI inspection artifacts
+.querypad/
+
 # vercel
 .vercel
 
@@ -51,7 +54,6 @@ yarn-error.log*
 
 # internal docs
 FEEDBACK.md
-ROADMAP-PHASE4.md
 DEMO.md
 docs/SHOW-HN.md
 

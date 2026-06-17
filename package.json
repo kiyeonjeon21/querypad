@@ -2,7 +2,7 @@
   "name": "querypad",
   "version": "0.6.0",
   "private": true,
-  "description": "Browser-native SQL playground powered by DuckDB-Wasm",
+  "description": "Cursor for Data — a local-first AI workspace that understands datasets (discovers relationships, builds semantic models) and analyzes them with DuckDB.",
   "author": "QueryPad Contributors",
   "license": "MIT",
   "repository": {
@@ -10,20 +10,31 @@
     "url": "https://github.com/vericontext/querypad.git"
   },
   "homepage": "https://querypad.io",
+  "bin": {
+    "querypad": "src/cli/index.ts"
+  },
   "keywords": [
-    "sql",
+    "cursor-for-data",
     "duckdb",
+    "sql",
+    "ai",
+    "llm",
+    "data-understanding",
+    "relationship-discovery",
+    "semantic-model",
+    "schema-inference",
+    "data-analysis",
     "csv",
     "parquet",
-    "json",
-    "analytics",
-    "data-analysis",
-    "browser"
+    "cli",
+    "claude",
+    "local-first"
   ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "querypad": "tsx src/cli/index.ts",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "check:version": "node scripts/check-version.mjs",
@@ -33,11 +44,13 @@
     "partykit:deploy": "partykit deploy",
     "postinstall": "node scripts/copy-duckdb-wasm.mjs",
     "test": "playwright test",
-    "test:ui": "playwright test --ui"
+    "test:ui": "playwright test --ui",
+    "test:cli": "node --import tsx --test test/*.test.ts"
   },
   "dependencies": {
     "@dagrejs/dagre": "^2.0.4",
     "@duckdb/duckdb-wasm": "^1.33.1-dev20.0",
+    "@duckdb/node-api": "^1.5.3-r.3",
     "@monaco-editor/react": "^4.7.0",
     "@tanstack/react-virtual": "^3.13.23",
     "@vercel/analytics": "^2.0.1",
@@ -66,6 +79,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.0",
     "tailwindcss": "^4",
+    "tsx": "^4.22.4",
     "typescript": "^5"
   }
 }

@@ -3,6 +3,47 @@
 QueryPad is a web app, not an npm package. Version numbers mark GitHub release
 milestones and public product updates.
 
+## Unreleased
+
+### Web: Relationship Verification
+
+- New Relationships panel in the sidebar: runs the same discovery engine in the browser
+  (DuckDB-Wasm) and lists inferred joins with confidence and a per-signal "why"
+- Accept / Reject / Edit each relationship to curate the AI's assumptions; verdicts and
+  edits persist across refresh (IndexedDB)
+- Reuses the engine-agnostic `src/lib/discovery` core (no logic duplicated between CLI and web)
+
+### CLI: Dataset Understanding
+
+- New `querypad inspect <folder>` command that profiles a folder of data files and
+  infers foreign-key relationships with confidence scores
+- New `querypad ask "<question>" <folder>` command (AI Analyst): generates SQL using the
+  inferred relationships as context, runs it on DuckDB, and explains the result
+- `inspect` now builds a semantic model (named business entities with belongs_to/has_many)
+  and writes `.querypad/semantic-model.yaml`; `ask` feeds those entities as context too
+- New `querypad explain <folder>` command: justifies each inferred relationship from its
+  signals (value overlap, name match, type, cardinality) and lists caveats to verify
+- Generated SQL is read-only-gated (only SELECT/WITH/EXPLAIN/… execute) and code-fence stripped
+- CLI AI keys come from `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`; provider via `--provider`
+- Writes `.querypad/` artifacts (`schema.json`, `relationships.json`, `inspect-summary.md`)
+  for AI agents such as Claude Code to reason about the dataset
+- Engine-agnostic discovery core shared between the browser app and the Node CLI
+- Runs on a native Node DuckDB engine (`@duckdb/node-api`), separate from the browser Wasm engine
+
+### Multi-Provider BYOK
+
+- OpenAI BYOK support for the Cmd+K AI SQL assistant via the Responses API
+- Provider selector for Claude and OpenAI with independent browser-local keys
+- Updated the default Claude model to `claude-sonnet-4-6`
+- Added `gpt-5.5` as the default OpenAI model
+
+### Data Profile & Agent Context
+
+- On-demand data profile drawer for loaded tables
+- Column-level nulls, distinct counts, numeric ranges, averages, and top values
+- Copy Agent Context action for Codex, Claude Code, or other coding agents
+- README positioning updated around local-first OSS and the hosted demo
+
 ## v0.6 — Open-Source Release
 
 - Vercel Analytics integration

@@ -3,6 +3,7 @@ import { get, set, del } from "idb-keyval";
 const WORKSPACE_KEY = "querypad-workspace";
 
 import type { Pipeline } from "@/types/pipeline";
+import type { Relationship, RelationshipVerdict } from "@/types/discovery";
 
 interface PersistedTab {
   id: string;
@@ -21,6 +22,9 @@ export interface PersistedWorkspace {
   activePipelineId?: string | null;
   viewMode?: "sql" | "pipeline";
   pluginUrls?: string[];
+  // Relationship verification (user-curated graph)
+  relationshipVerdicts?: Record<string, RelationshipVerdict>;
+  relationshipOverrides?: Relationship[];
 }
 
 export async function saveWorkspace(
@@ -40,6 +44,8 @@ export async function saveWorkspace(
     activePipelineId: workspace.activePipelineId,
     viewMode: workspace.viewMode,
     pluginUrls: workspace.pluginUrls,
+    relationshipVerdicts: workspace.relationshipVerdicts,
+    relationshipOverrides: workspace.relationshipOverrides,
   };
   await set(WORKSPACE_KEY, clone);
 }

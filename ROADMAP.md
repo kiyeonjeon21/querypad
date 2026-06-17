@@ -1,0 +1,172 @@
+# QueryPad Roadmap — Cursor for Data
+
+QueryPad is pivoting from "AI-powered SQL editor" to **Cursor for Data**: a
+local-first AI workspace that understands folders of CSV/Parquet files, discovers
+relationships, builds semantic models, and answers business questions using DuckDB.
+
+The execution layer is solved — DuckDB does it well. The unsolved problem is
+**dataset understanding**: which tables exist, what each field means, how datasets
+connect, which join is correct. That is the bottleneck this roadmap attacks, and
+the reason we build the understanding engine **CLI-first** before investing in UI.
+
+> Cursor understands code → generates code → edits code → runs code.
+> QueryPad understands datasets → infers relationships → generates SQL → executes analysis → explains findings.
+>
+> The semantic model is the AST for data. The relationship graph is the codebase graph.
+
+## The four layers
+
+```text
+Layer 1  Dataset Discovery   →  profile files: schema, stats, uniqueness, cardinality
+Layer 2  Relationship Disc.  →  infer joins automatically, with confidence scores
+Layer 3  Semantic Model      →  roll relationships into named business entities
+Layer 4  AI Analyst          →  question → semantic model → SQL → execution → insight
+```
+
+| Layer | Deliverable | Status |
+|-------|-------------|--------|
+| 1 — Dataset Discovery | Folder scan + per-column profiles (`profileTable`, `loadFolder`) | ✅ Built |
+| 2 — Relationship Discovery | Confidence-scored FK inference (`discoverRelationships`, `querypad inspect`) | ✅ Built |
+| 4 — AI Analyst | `querypad ask`: NL → SQL (relationship-aware) → execution → insight | ✅ Built |
+| 3 — Semantic Model | Entity rollup → `.querypad/semantic-model.yaml` | 🚧 Next |
+| UI — AI Verification | Lightweight web UI to accept/reject/edit inferred relationships | 🚧 Planned |
+| `querypad explain` | Justify confidence from stored `RelationshipSignals` | 🚧 Planned |
+
+## Built today
+
+Two CLI commands ship: `querypad inspect` (Layers 1–2) and `querypad ask` (Layer 4).
+
+```bash
+querypad inspect ./data
+```
+
+```text
+Tables:        3
+Relationships: 2
+  payments.user_id ↳ users.id  (100%, many-to-one)
+  events.user_id   ↳ users.id  (100%, many-to-one)
+Wrote artifacts to ./data/.querypad
+```
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-... querypad ask "payments by plan" ./data
+```
+
+```text
+-- SQL
+SELECT u.plan, COUNT(*) AS payment_count, SUM(p.amount) AS total
+FROM payments p JOIN users u ON p.user_id = u.id GROUP BY u.plan
+...
+Insight: All payments come from paid-plan users.
+```
+
+Architecture (engine-agnostic core, two DuckDB bindings):
+
+```text
+src/lib/discovery/     signals.ts · relationships.ts · sql-safety.ts (read-only gate)
+src/lib/ai/            complete.ts (shared streaming) · generate-sql.ts · providers.ts
+src/lib/duckdb-node/   connection.ts · load.ts · profile.ts   (native @duckdb/node-api)
+src/lib/duckdb/        sql-utils.ts (shared) · profile.ts      (browser DuckDB-Wasm)
+src/cli/               index.ts (dispatch) · inspect.ts · ask.ts · artifacts.ts
+```
+
+Relationship discovery: profile each table → find primary-key candidates (unique,
+non-null) → prune FK pairs by name similarity + type compatibility → run a
+value-overlap query per survivor → blend four signals (value overlap, name
+similarity, type match, cardinality shape) into a 0–100% confidence → keep each
+foreign column's single strongest target (competition disambiguation) so
+overlapping id ranges don't yield false positives.
+
+Artifacts written to `.querypad/`:
+
+```text
+schema.json          tables, columns, types, per-column profiles
+relationships.json   inferred joins with confidence + per-signal breakdown
+inspect-summary.md   human- and agent-readable overview
+```
+
+## Layer 3 — Semantic Model (next)
+
+Roll inferred relationships into named business entities, stored as the source of truth.
+
+```yaml
+# .querypad/semantic-model.yaml
+entities:
+  - name: Customer
+    table: users
+    has_many: [Payment, Event]
+  - name: Payment
+    table: payments
+    belongs_to: Customer
+```
+
+- Derive entity names from table names (singularize) and the relationship graph.
+- Persist as `semantic-model.yaml`; let users override/curate it.
+- Surface conflicts (ambiguous joins, multiple FK candidates) for resolution.
+
+## Layer 4 — AI Analyst (built)
+
+```bash
+querypad ask "show 7-day retention for paid users" ./data
+```
+
+```text
+Question → inferred relationships as context → SQL generation → DuckDB execution → insight
+```
+
+- Reuses the AI layer (`src/lib/ai/complete.ts`, Claude + OpenAI). CLI keys come from
+  `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`; provider via `--provider`.
+- Feeds the inferred relationships (`buildAskContext`) so generated SQL joins on the
+  right keys. Once Layer 3 lands, `ask` will prefer the semantic model as context.
+- Generated SQL is read-only-gated (`isReadOnlyQuery`) and code-fence stripped before
+  execution; the in-memory DB is reloaded from files each run, so sources are never touched.
+- `--show-sql` previews the SQL without executing.
+
+Still planned: `querypad explain` renders the stored per-signal breakdown to justify
+each inferred relationship and surface potential conflicts.
+
+## UI — AI Verification (planned)
+
+After the CLI proves the understanding engine, build a **lightweight local web UI**
+— not Tableau, not Metabase. Its purpose is **AI verification**, not dashboard building.
+
+```text
+Left            Center        Right
+─────           ──────        ──────
+Tables          Chat          Generated SQL
+Relationships                 Results
+```
+
+The defining interaction is validating AI assumptions:
+
+```text
+Detected relationship
+  users.id ↳ payments.user_id     Confidence 97%
+  [Accept]  [Reject]  [Edit]
+```
+
+This reuses the shared `src/lib/discovery` core, surfacing the same edges the CLI
+emits. The existing browser app (Monaco, charts, pipelines, sharing) remains the
+interactive-analysis surface; the verification view is additive.
+
+## Claude Code integration
+
+`querypad inspect` makes the dataset legible to coding agents. Instead of guessing
+with pandas, Claude Code reads `.querypad/schema.json` + `relationships.json` and
+reasons about the data directly:
+
+```text
+Claude Code  +  QueryPad  +  DuckDB
+```
+
+A future MCP server can expose the same engine (`inspect`, `ask`, `describe`) as
+typed tools for agent workflows — a natural follow-on once Layers 3–4 land.
+
+## Principles
+
+- **Use DuckDB.** Do not build a database or a query engine.
+- **Understanding before UI.** Relationship inference and semantic modeling are the
+  bottleneck; a dashboard built before solving them is just another BI tool.
+- **Local-first.** Computation and storage stay on the user's machine; AI is BYOK.
+- **Agent-native.** Artifacts are structured, typed, and token-efficient so agents
+  can consume them directly.

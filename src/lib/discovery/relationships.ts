@@ -19,6 +19,11 @@ import {
  */
 export type QueryRunner = (sql: string) => Promise<Record<string, unknown>[]>;
 
+/** Stable directional identity for a relationship (foreign endpoint → key endpoint). */
+export function relationshipKey(rel: Relationship): string {
+  return `${rel.from.table}.${rel.from.column}->${rel.to.table}.${rel.to.column}`;
+}
+
 /** Minimum blended confidence for an edge to be reported. */
 const CONFIDENCE_FLOOR = 50;
 

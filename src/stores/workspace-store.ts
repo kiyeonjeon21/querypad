@@ -1,5 +1,10 @@
 import { create } from "zustand";
 import type { TableInfo, EditorTab, TableProfileState } from "@/types";
+import type {
+  Relationship,
+  RelationshipDiscoveryState,
+  RelationshipVerdict,
+} from "@/types/discovery";
 import type { Pipeline, PipelineStep, PipelineExecutionResult } from "@/types/pipeline";
 import type { LoadedPlugin } from "@/types/plugin";
 import {
@@ -8,11 +13,33 @@ import {
   clearPersistedWorkspace,
 } from "@/lib/persistence/indexeddb";
 import { getConnection } from "@/lib/duckdb/instance";
+import {
+  discoverRelationships as runDiscovery,
+  relationshipKey,
+} from "@/lib/discovery/relationships";
+import { createBrowserQueryRunner } from "@/lib/duckdb/browser-runner";
 
 interface FileEntry {
   name: string;
   fileName: string;
   data: Uint8Array;
+}
+
+const IDLE_DISCOVERY: RelationshipDiscoveryState = {
+  status: "idle",
+  relationships: [],
+  error: null,
+};
+
+/** Merge user overrides onto a base relationship list (override wins, by key). */
+function mergeOverrides(
+  base: Relationship[],
+  overrides: Relationship[]
+): Relationship[] {
+  const byKey = new Map<string, Relationship>();
+  for (const rel of base) byKey.set(relationshipKey(rel), rel);
+  for (const rel of overrides) byKey.set(relationshipKey(rel), rel);
+  return [...byKey.values()];
 }
 
 const MAX_TABS = 20;
@@ -48,6 +75,14 @@ interface WorkspaceState {
   removeTable: (name: string) => void;
   loadTableProfile: (name: string) => Promise<void>;
   clearTableProfile: (name: string) => void;
+
+  // Relationship discovery + verification
+  discovery: RelationshipDiscoveryState;
+  relationshipVerdicts: Record<string, RelationshipVerdict>;
+  relationshipOverrides: Relationship[];
+  discoverRelationships: () => Promise<void>;
+  setRelationshipVerdict: (key: string, verdict: RelationshipVerdict | null) => void;
+  editRelationship: (oldKey: string, next: Relationship) => void;
 
   // Clear
   clearWorkspace: () => Promise<void>;
@@ -144,6 +179,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         if (persisted.viewMode) {
           patch.viewMode = persisted.viewMode;
         }
+        if (persisted.relationshipVerdicts) {
+          patch.relationshipVerdicts = persisted.relationshipVerdicts;
+        }
+        if (persisted.relationshipOverrides) {
+          patch.relationshipOverrides = persisted.relationshipOverrides;
+        }
 
         set(patch);
 
@@ -183,6 +224,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         ...state.tableProfiles,
         [table.name]: { status: "idle", profile: null, error: null },
       },
+      // Tables changed — the relationship graph must be re-derived.
+      discovery: IDLE_DISCOVERY,
     })),
   removeTable: async (name) => {
     set((state) => ({
@@ -190,6 +233,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       fileEntries: state.fileEntries.filter((f) => f.name !== name),
       tableProfiles: Object.fromEntries(
         Object.entries(state.tableProfiles).filter(([tableName]) => tableName !== name)
+      ),
+      discovery: IDLE_DISCOVERY,
+      relationshipOverrides: state.relationshipOverrides.filter(
+        (rel) => rel.from.table !== name && rel.to.table !== name
       ),
     }));
     try {
@@ -217,6 +264,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       tables: [],
       fileEntries: [],
       tableProfiles: {},
+      discovery: IDLE_DISCOVERY,
+      relationshipVerdicts: {},
+      relationshipOverrides: [],
       tabs: [tab],
       activeTabId: tab.id,
       shareUrl: null,
@@ -268,6 +318,78 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         Object.entries(state.tableProfiles).filter(([tableName]) => tableName !== name)
       ),
     })),
+
+  discovery: IDLE_DISCOVERY,
+  relationshipVerdicts: {},
+  relationshipOverrides: [],
+
+  discoverRelationships: async () => {
+    const tables = get().tables;
+    const names = new Set(tables.map((t) => t.name));
+    const validOverrides = () =>
+      get().relationshipOverrides.filter(
+        (rel) => names.has(rel.from.table) && names.has(rel.to.table)
+      );
+
+    if (tables.length < 2) {
+      set({
+        discovery: { status: "ready", relationships: validOverrides(), error: null },
+      });
+      return;
+    }
+
+    set((state) => ({ discovery: { ...state.discovery, status: "loading", error: null } }));
+    try {
+      const { profileTable } = await import("@/lib/duckdb/profile");
+      const profiles = [];
+      for (const table of tables) profiles.push(await profileTable(table));
+      const base = await runDiscovery(profiles, createBrowserQueryRunner());
+      set({
+        discovery: {
+          status: "ready",
+          relationships: mergeOverrides(base, validOverrides()),
+          error: null,
+        },
+      });
+    } catch (err) {
+      set({
+        discovery: {
+          status: "error",
+          relationships: [],
+          error: err instanceof Error ? err.message : String(err),
+        },
+      });
+    }
+  },
+
+  setRelationshipVerdict: (key, verdict) =>
+    set((state) => {
+      const next = { ...state.relationshipVerdicts };
+      if (verdict === null) delete next[key];
+      else next[key] = verdict;
+      return { relationshipVerdicts: next };
+    }),
+
+  editRelationship: (oldKey, next) =>
+    set((state) => {
+      const nextKey = relationshipKey(next);
+      const verdicts = { ...state.relationshipVerdicts };
+      delete verdicts[oldKey];
+      verdicts[nextKey] = "accepted";
+      const overrides = state.relationshipOverrides.filter(
+        (rel) => relationshipKey(rel) !== oldKey && relationshipKey(rel) !== nextKey
+      );
+      overrides.push(next);
+      const relationships = mergeOverrides(
+        state.discovery.relationships.filter((rel) => relationshipKey(rel) !== oldKey),
+        [next]
+      );
+      return {
+        relationshipVerdicts: verdicts,
+        relationshipOverrides: overrides,
+        discovery: { ...state.discovery, relationships },
+      };
+    }),
 
   tabs: [initialTab],
   activeTabId: initialTab.id,
@@ -415,7 +537,9 @@ useWorkspaceStore.subscribe((state, prevState) => {
     state.pipelines !== prevState.pipelines ||
     state.activePipelineId !== prevState.activePipelineId ||
     state.viewMode !== prevState.viewMode ||
-    state.plugins !== prevState.plugins
+    state.plugins !== prevState.plugins ||
+    state.relationshipVerdicts !== prevState.relationshipVerdicts ||
+    state.relationshipOverrides !== prevState.relationshipOverrides
   ) {
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
@@ -435,6 +559,8 @@ useWorkspaceStore.subscribe((state, prevState) => {
         pluginUrls: state.plugins
           .filter((p) => p.url)
           .map((p) => p.url),
+        relationshipVerdicts: state.relationshipVerdicts,
+        relationshipOverrides: state.relationshipOverrides,
       }).catch(console.error);
     }, 500);
   }

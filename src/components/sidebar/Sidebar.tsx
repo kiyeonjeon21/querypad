@@ -5,12 +5,14 @@ import { useWorkspaceStore } from "@/stores/workspace-store";
 import { SAMPLE_TABLE_NAMES } from "@/lib/constants";
 import TableSchema from "./TableSchema";
 import ProfileDrawer from "./ProfileDrawer";
+import RelationshipsPanel from "./RelationshipsPanel";
 import DropZone from "@/components/dropzone/DropZone";
 
 export default function Sidebar() {
   const tables = useWorkspaceStore((s) => s.tables);
   const removeTable = useWorkspaceStore((s) => s.removeTable);
   const [profileTableName, setProfileTableName] = useState<string | null>(null);
+  const [showRelationships, setShowRelationships] = useState(false);
   const onlySampleTables =
     tables.length > 0 && tables.every((t) => SAMPLE_TABLE_NAMES.has(t.name));
   const visibleProfileTableName =
@@ -43,6 +45,20 @@ export default function Sidebar() {
           </h2>
           <DropZone compact highlight={onlySampleTables} onFilesAdded={handleFilesAdded} />
         </div>
+        <button
+          onClick={() => setShowRelationships((v) => !v)}
+          className={`mx-2 my-1 flex items-center gap-1.5 rounded px-2 py-1 text-[11px] transition-colors ${
+            showRelationships
+              ? "text-green-700 bg-green-50"
+              : "text-gray-500 hover:text-green-600 hover:bg-green-50"
+          }`}
+          aria-label="Relationships"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H17a3 3 0 010 6h-3.5M10.5 18H7a3 3 0 010-6h3.5M8 15h8" />
+          </svg>
+          Relationships
+        </button>
         <div className="flex-1 overflow-y-auto py-1">
           {tables.length === 0 ? (
             <p className="px-3 py-4 text-xs text-gray-400 text-center">
@@ -66,6 +82,9 @@ export default function Sidebar() {
           tableName={visibleProfileTableName}
           onClose={() => setProfileTableName(null)}
         />
+      )}
+      {showRelationships && (
+        <RelationshipsPanel onClose={() => setShowRelationships(false)} />
       )}
     </div>
   );

@@ -45,6 +45,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Run CLI tests
+        run: npm run test:cli
+
       - name: Run e2e tests
         timeout-minutes: 10
         run: npm test -- --reporter=line

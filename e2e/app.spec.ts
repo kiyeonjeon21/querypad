@@ -56,6 +56,30 @@ test.describe("QueryPad", () => {
     expect(copied).toContain("## Latest Result");
   });
 
+  test("discovers and verifies relationships", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByRole("button", { name: "employees", exact: true })).toBeVisible({ timeout: 15000 });
+
+    // Open the relationships verification panel
+    await page.getByRole("button", { name: "Relationships" }).click();
+    await expect(page.getByRole("heading", { name: "Relationships" })).toBeVisible();
+
+    // Discovery completes (ready subtitle shows the inferred count)
+    await expect(page.getByText(/inferred/)).toBeVisible({ timeout: 15000 });
+
+    // Sample data has an employees -> departments relationship
+    const accept = page.getByRole("button", { name: "Accept" }).first();
+    await expect(accept).toBeVisible({ timeout: 10000 });
+
+    // "Why?" reveals the signal-based justification (reused buildExplanation)
+    await page.getByRole("button", { name: "Why?" }).first().click();
+    await expect(page.getByText(/values are present in/).first()).toBeVisible();
+
+    // Accept the relationship
+    await accept.click();
+    await expect(page.getByRole("button", { name: "Accept" }).first()).toBeVisible();
+  });
+
   test("can switch AI SQL assistant provider", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByRole("button", { name: "employees", exact: true })).toBeVisible({ timeout: 15000 });

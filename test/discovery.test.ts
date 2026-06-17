@@ -10,12 +10,31 @@ import {
   splitTokens,
   typeMatchScore,
 } from "../src/lib/discovery/signals";
-import { discoverRelationships } from "../src/lib/discovery/relationships";
+import { discoverRelationships, relationshipKey } from "../src/lib/discovery/relationships";
 import { createNodeDb } from "../src/lib/duckdb-node/connection";
 import { loadFolder } from "../src/lib/duckdb-node/load";
 import { profileTable } from "../src/lib/duckdb-node/profile";
 
 // ---- Pure signal unit tests ---------------------------------------------------
+
+test("relationshipKey is directional and stable", () => {
+  const forward = relationshipKey({
+    from: { table: "payments", column: "user_id" },
+    to: { table: "users", column: "id" },
+    confidence: 100,
+    cardinality: "many-to-one",
+    signals: { valueOverlap: 1, nameSimilarity: 1, typeMatch: 1, cardinalityShape: 1 },
+  });
+  const reversed = relationshipKey({
+    from: { table: "users", column: "id" },
+    to: { table: "payments", column: "user_id" },
+    confidence: 100,
+    cardinality: "many-to-one",
+    signals: { valueOverlap: 1, nameSimilarity: 1, typeMatch: 1, cardinalityShape: 1 },
+  });
+  assert.equal(forward, "payments.user_id->users.id");
+  assert.notEqual(forward, reversed);
+});
 
 test("splitTokens handles snake_case and camelCase", () => {
   assert.deepEqual(splitTokens("user_id"), ["user", "id"]);

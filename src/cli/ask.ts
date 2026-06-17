@@ -2,6 +2,7 @@ import { complete } from "../lib/ai/complete";
 import { SQL_SYSTEM_PROMPT, buildSqlInput } from "../lib/ai/generate-sql";
 import { buildAskContext } from "../lib/agent/ask-context";
 import { discoverRelationships } from "../lib/discovery/relationships";
+import { buildSemanticModel } from "../lib/discovery/semantic-model";
 import { isReadOnlyQuery, stripSqlFences } from "../lib/discovery/sql-safety";
 import { createNodeDb, type QueryResultRows } from "../lib/duckdb-node/connection";
 import { loadFolder } from "../lib/duckdb-node/load";
@@ -83,7 +84,12 @@ export async function runAsk(options: RunAskOptions): Promise<AskResult> {
       relationships = await discoverRelationships(profiles, db.runner);
     }
 
-    const context = buildAskContext({ tables, relationships });
+    const semanticModel = buildSemanticModel(
+      tables.map((table) => table.name),
+      relationships,
+      Date.now()
+    );
+    const context = buildAskContext({ tables, relationships, semanticModel });
     const sql = stripSqlFences(await ai.generateSql({ context, question: options.question }));
 
     log("-- SQL");

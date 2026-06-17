@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { renderSemanticYaml } from "../lib/discovery/semantic-model";
 import type { TableProfile } from "../types";
 import type { DiscoveryReport, Relationship } from "../types/discovery";
 
@@ -35,10 +36,11 @@ export interface WrittenArtifacts {
   dir: string;
   schemaPath: string;
   relationshipsPath: string;
+  semanticModelPath: string;
   summaryPath: string;
 }
 
-/** Write schema.json, relationships.json and inspect-summary.md under <folder>/.querypad/. */
+/** Write schema.json, relationships.json, semantic-model.yaml and inspect-summary.md. */
 export async function writeArtifacts(
   folder: string,
   report: DiscoveryReport,
@@ -49,6 +51,7 @@ export async function writeArtifacts(
 
   const schemaPath = path.join(dir, "schema.json");
   const relationshipsPath = path.join(dir, "relationships.json");
+  const semanticModelPath = path.join(dir, "semantic-model.yaml");
   const summaryPath = path.join(dir, "inspect-summary.md");
 
   await writeFile(
@@ -63,9 +66,10 @@ export async function writeArtifacts(
       2
     )
   );
+  await writeFile(semanticModelPath, renderSemanticYaml(report.semanticModel));
   await writeFile(summaryPath, buildSummary(report, skipped));
 
-  return { dir, schemaPath, relationshipsPath, summaryPath };
+  return { dir, schemaPath, relationshipsPath, semanticModelPath, summaryPath };
 }
 
 /** Human- and agent-readable markdown overview of the inspection. */
@@ -106,6 +110,23 @@ export function buildSummary(report: DiscoveryReport, skipped: string[]): string
     lines.push("");
   }
 
+  const entities = report.semanticModel.entities;
+  lines.push(`## Entities (${entities.length})`, "");
+  if (entities.length === 0) {
+    lines.push("No entities derived.", "");
+  } else {
+    for (const entity of entities) {
+      const assoc = [
+        entity.belongsTo.length > 0 ? `belongs_to: ${entity.belongsTo.join(", ")}` : null,
+        entity.hasMany.length > 0 ? `has_many: ${entity.hasMany.join(", ")}` : null,
+        entity.hasOne.length > 0 ? `has_one: ${entity.hasOne.join(", ")}` : null,
+      ].filter(Boolean);
+      const detail = assoc.length > 0 ? ` — ${assoc.join("; ")}` : "";
+      lines.push(`- ${entity.name} (${entity.table})${detail}`);
+    }
+    lines.push("");
+  }
+
   if (skipped.length > 0) {
     lines.push(`## Skipped files (${skipped.length})`, "");
     lines.push(skipped.map((name) => `- ${name} (unsupported type)`).join("\n"), "");
@@ -114,8 +135,8 @@ export function buildSummary(report: DiscoveryReport, skipped: string[]): string
   lines.push(
     "## Next steps",
     "",
-    "- Review inferred relationships and adjust as needed.",
-    "- Feed `.querypad/schema.json` + `.querypad/relationships.json` to an AI agent to reason about the dataset.",
+    "- Review inferred relationships and entities, and adjust as needed.",
+    "- Feed `.querypad/schema.json`, `relationships.json`, and `semantic-model.yaml` to an AI agent to reason about the dataset.",
     ""
   );
 

@@ -1,5 +1,6 @@
 import path from "node:path";
 import { discoverRelationships } from "../lib/discovery/relationships";
+import { buildSemanticModel } from "../lib/discovery/semantic-model";
 import { createNodeDb } from "../lib/duckdb-node/connection";
 import { loadFolder } from "../lib/duckdb-node/load";
 import { profileTable } from "../lib/duckdb-node/profile";
@@ -21,7 +22,12 @@ export async function runInspect(folder: string, now: number): Promise<Discovery
       console.error(
         "No supported data files found (.parquet, .csv, .tsv, .json, .jsonl, .ndjson)."
       );
-      const report: DiscoveryReport = { generatedAt: now, profiles: [], relationships: [] };
+      const report: DiscoveryReport = {
+        generatedAt: now,
+        profiles: [],
+        relationships: [],
+        semanticModel: { generatedAt: now, entities: [] },
+      };
       await writeArtifacts(resolved, report, skipped);
       return report;
     }
@@ -34,8 +40,13 @@ export async function runInspect(folder: string, now: number): Promise<Discovery
 
     console.log("Discovering relationships ...");
     const relationships = await discoverRelationships(profiles, db.runner);
+    const semanticModel = buildSemanticModel(
+      profiles.map((profile) => profile.tableName),
+      relationships,
+      now
+    );
 
-    const report: DiscoveryReport = { generatedAt: now, profiles, relationships };
+    const report: DiscoveryReport = { generatedAt: now, profiles, relationships, semanticModel };
     const artifacts = await writeArtifacts(resolved, report, skipped);
 
     console.log("");
@@ -46,6 +57,12 @@ export async function runInspect(folder: string, now: number): Promise<Discovery
         `  ${rel.from.table}.${rel.from.column} ↳ ${rel.to.table}.${rel.to.column}` +
           `  (${rel.confidence}%, ${rel.cardinality})`
       );
+    }
+    console.log(`Entities:      ${semanticModel.entities.length}`);
+    for (const entity of semanticModel.entities) {
+      const links = [...entity.hasMany, ...entity.hasOne];
+      const detail = links.length > 0 ? `  → ${links.join(", ")}` : "";
+      console.log(`  ${entity.name} (${entity.table})${detail}`);
     }
     if (skipped.length > 0) {
       console.log(`Skipped:       ${skipped.length} unsupported file(s)`);

@@ -1,5 +1,6 @@
 #!/usr/bin/env -S npx tsx
 import { runAsk } from "./ask";
+import { runExplain } from "./explain";
 import { runInspect } from "./inspect";
 
 const HELP = `querypad — local-first dataset understanding
@@ -10,6 +11,8 @@ Usage:
   querypad ask "<question>" [folder]
                                    Answer a natural-language question: generate SQL using the
                                    inferred relationships, run it, and explain the result.
+  querypad explain [folder]        Justify each inferred relationship from its signals,
+                                   with caveats to verify (reads .querypad/; run inspect first).
   querypad help                    Show this help
 
 Options for ask:
@@ -76,6 +79,10 @@ async function main(argv: string[]): Promise<number> {
         showSql: flags["show-sql"] === true,
       });
       return 0;
+    }
+    case "explain": {
+      const { positionals } = parseArgs(rest);
+      return runExplain(positionals[0] ?? ".");
     }
     default:
       console.error(`Unknown command: ${command}\n`);

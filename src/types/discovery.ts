@@ -34,9 +34,30 @@ export interface Relationship {
   signals: RelationshipSignals;
 }
 
+/** A named business entity derived from a table and its relationships. */
+export interface SemanticEntity {
+  /** PascalCase singular, e.g. "User". */
+  name: string;
+  /** Source table, e.g. "users". */
+  table: string;
+  /** Entity names this entity references (foreign-key side). */
+  belongsTo: string[];
+  /** Entity names that reference this one with a many-to-one relationship. */
+  hasMany: string[];
+  /** Entity names that reference this one with a one-to-one relationship. */
+  hasOne: string[];
+}
+
+/** The semantic model: business entities rolled up from tables + relationships. */
+export interface SemanticModel {
+  generatedAt: number;
+  entities: SemanticEntity[];
+}
+
 /** Full output of a folder inspection, serialized to .querypad/ artifacts. */
 export interface DiscoveryReport {
   generatedAt: number;
   profiles: TableProfile[];
   relationships: Relationship[];
+  semanticModel: SemanticModel;
 }

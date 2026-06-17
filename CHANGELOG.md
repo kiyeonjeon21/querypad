@@ -11,6 +11,10 @@ milestones and public product updates.
   infers foreign-key relationships with confidence scores
 - New `querypad ask "<question>" <folder>` command (AI Analyst): generates SQL using the
   inferred relationships as context, runs it on DuckDB, and explains the result
+- `inspect` now builds a semantic model (named business entities with belongs_to/has_many)
+  and writes `.querypad/semantic-model.yaml`; `ask` feeds those entities as context too
+- New `querypad explain <folder>` command: justifies each inferred relationship from its
+  signals (value overlap, name match, type, cardinality) and lists caveats to verify
 - Generated SQL is read-only-gated (only SELECT/WITH/EXPLAIN/… execute) and code-fence stripped
 - CLI AI keys come from `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`; provider via `--provider`
 - Writes `.querypad/` artifacts (`schema.json`, `relationships.json`, `inspect-summary.md`)

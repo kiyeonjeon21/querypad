@@ -61,7 +61,21 @@ read to reason about the dataset instead of guessing at pandas:
 .querypad/
   schema.json          # tables, columns, types, per-column profiles
   relationships.json   # inferred joins with confidence + signals
+  semantic-model.yaml  # named business entities (belongs_to / has_many)
   inspect-summary.md   # human- and agent-readable overview
+```
+
+`inspect` also rolls the relationships into a semantic model of named entities:
+
+```yaml
+# .querypad/semantic-model.yaml
+entities:
+  - name: User
+    table: users
+    has_many: [Payment, Event]
+  - name: Payment
+    table: payments
+    belongs_to: [User]
 ```
 
 ```text
@@ -85,7 +99,7 @@ don't produce false positives.
 |-------|--------------|--------|
 | **1 — Dataset Discovery** | Scan folders; detect schema, types, statistics, uniqueness, cardinality | ✅ Built (`profile`) |
 | **2 — Relationship Discovery** | Infer joins automatically with confidence scores | ✅ Built (`inspect`) |
-| **3 — Semantic Model** | Roll relationships into named business entities (`Customer ├ Payment ├ Event`) | 🚧 Roadmap |
+| **3 — Semantic Model** | Roll relationships into named business entities (`User ├ Payment ├ Event`) | ✅ Built (`inspect`) |
 | **4 — AI Analyst** | Natural-language questions → SQL → execution → insight (`ask`) | ✅ Built (`ask`) |
 
 See [ROADMAP.md](ROADMAP.md) for the full plan.
@@ -115,6 +129,25 @@ Insight: All payments come from paid-plan users.
 
 Generated SQL is read-only-gated (only `SELECT`/`WITH`/… execute) and the DB is in-memory,
 so source files are never modified. Use `--show-sql` to preview the SQL without running it.
+
+## CLI: explain why
+
+```bash
+querypad explain ./data
+```
+
+Justifies each inferred relationship from its stored signals, and lists caveats to verify:
+
+```text
+payments.user_id ↳ users.id — 100% (many-to-one)
+  • 100% of distinct payments.user_id values are present in users.id
+  • column name strongly matches the target
+  • exact type match
+  • many-to-one (target key is unique)
+
+Caveats (0)
+  None.
+```
 
 ## Web app: interactive analysis
 

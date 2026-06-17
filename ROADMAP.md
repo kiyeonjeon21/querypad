@@ -27,10 +27,11 @@ Layer 4  AI Analyst          →  question → semantic model → SQL → execut
 |-------|-------------|--------|
 | 1 — Dataset Discovery | Folder scan + per-column profiles (`profileTable`, `loadFolder`) | ✅ Built |
 | 2 — Relationship Discovery | Confidence-scored FK inference (`discoverRelationships`, `querypad inspect`) | ✅ Built |
+| 3 — Semantic Model | Entity rollup → `.querypad/semantic-model.yaml` (`buildSemanticModel`) | ✅ Built |
 | 4 — AI Analyst | `querypad ask`: NL → SQL (relationship-aware) → execution → insight | ✅ Built |
-| 3 — Semantic Model | Entity rollup → `.querypad/semantic-model.yaml` | 🚧 Next |
-| UI — AI Verification | Lightweight web UI to accept/reject/edit inferred relationships | 🚧 Planned |
-| `querypad explain` | Justify confidence from stored `RelationshipSignals` | 🚧 Planned |
+| `querypad explain` | Justify each relationship from stored `RelationshipSignals` + caveats | ✅ Built |
+| UI — AI Verification | Lightweight web UI to accept/reject/edit inferred relationships | 🚧 Next |
+| MCP server | Expose `inspect`/`ask`/`explain` as typed agent tools | 🚧 Planned |
 
 ## Built today
 
@@ -63,11 +64,11 @@ Insight: All payments come from paid-plan users.
 Architecture (engine-agnostic core, two DuckDB bindings):
 
 ```text
-src/lib/discovery/     signals.ts · relationships.ts · sql-safety.ts (read-only gate)
+src/lib/discovery/     signals.ts · relationships.ts · semantic-model.ts · explain.ts · sql-safety.ts
 src/lib/ai/            complete.ts (shared streaming) · generate-sql.ts · providers.ts
 src/lib/duckdb-node/   connection.ts · load.ts · profile.ts   (native @duckdb/node-api)
 src/lib/duckdb/        sql-utils.ts (shared) · profile.ts      (browser DuckDB-Wasm)
-src/cli/               index.ts (dispatch) · inspect.ts · ask.ts · artifacts.ts
+src/cli/               index.ts (dispatch) · inspect.ts · ask.ts · explain.ts · artifacts.ts
 ```
 
 Relationship discovery: profile each table → find primary-key candidates (unique,
@@ -82,26 +83,35 @@ Artifacts written to `.querypad/`:
 ```text
 schema.json          tables, columns, types, per-column profiles
 relationships.json   inferred joins with confidence + per-signal breakdown
+semantic-model.yaml  named business entities (belongs_to / has_many / has_one)
 inspect-summary.md   human- and agent-readable overview
 ```
 
-## Layer 3 — Semantic Model (next)
+## Layer 3 — Semantic Model (built)
 
-Roll inferred relationships into named business entities, stored as the source of truth.
+Rolls inferred relationships into named business entities, stored as the source of truth.
 
 ```yaml
 # .querypad/semantic-model.yaml
 entities:
-  - name: Customer
+  - name: User
     table: users
-    has_many: [Payment, Event]
+    has_many:
+      - Payment
+      - Event
   - name: Payment
     table: payments
-    belongs_to: Customer
+    belongs_to:
+      - User
 ```
 
-- Derive entity names from table names (singularize) and the relationship graph.
-- Persist as `semantic-model.yaml`; let users override/curate it.
+- Entity names are derived mechanically (`buildSemanticModel`): singularize → PascalCase
+  (`users` → `User`, `order_items` → `OrderItem`), with deterministic collision handling.
+  This keeps `inspect` key-free and deterministic.
+- Associations come from the relationship graph: FK side `belongs_to`, PK side `has_many`
+  (or `has_one` for one-to-one).
+- `ask` feeds the entities into its context so generated SQL is reasoned in domain terms.
+- Future: AI/user-curated renames (e.g. `users` → `Customer`) over the mechanical defaults.
 - Surface conflicts (ambiguous joins, multiple FK candidates) for resolution.
 
 ## Layer 4 — AI Analyst (built)
@@ -116,14 +126,19 @@ Question → inferred relationships as context → SQL generation → DuckDB exe
 
 - Reuses the AI layer (`src/lib/ai/complete.ts`, Claude + OpenAI). CLI keys come from
   `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`; provider via `--provider`.
-- Feeds the inferred relationships (`buildAskContext`) so generated SQL joins on the
-  right keys. Once Layer 3 lands, `ask` will prefer the semantic model as context.
+- Feeds the inferred relationships and the semantic model's entities (`buildAskContext`)
+  so generated SQL joins on the right keys and is reasoned in domain terms.
 - Generated SQL is read-only-gated (`isReadOnlyQuery`) and code-fence stripped before
   execution; the in-memory DB is reloaded from files each run, so sources are never touched.
 - `--show-sql` previews the SQL without executing.
 
-Still planned: `querypad explain` renders the stored per-signal breakdown to justify
-each inferred relationship and surface potential conflicts.
+## `querypad explain` (built)
+
+`querypad explain <folder>` reads `.querypad/relationships.json` and renders the stored
+per-signal breakdown (`buildExplanation`) as a justification for each inferred relationship:
+value overlap, name match, type match, and cardinality. It also surfaces caveats —
+low-confidence edges, high-overlap/weak-name matches that may be coincidental, and tables
+with no inferred relationships. Pure consumer of artifacts (no DuckDB / AI); run `inspect` first.
 
 ## UI — AI Verification (planned)
 

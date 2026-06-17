@@ -157,6 +157,7 @@ client-side. Your data stays on your machine unless you explicitly share or coll
 - **Drag & drop anything** — CSV, Parquet, JSON, Excel — drop multiple formats at once and JOIN them
 - **DuckDB-Wasm SQL** — Full analytical SQL in the browser (JOIN, GROUP BY, window functions, …)
 - **Data profiles** — Column-level nulls, distinct counts, ranges, averages, and top values
+- **Relationship verification** — Discover inferred joins in-browser; Accept / Reject / Edit each with a per-signal "why" (verdicts persist)
 - **Agent context** — Copy schema, profiles, active SQL, and latest results for Claude Code or Codex
 - **AI SQL assistant** — Cmd+K for natural language to SQL with Claude or OpenAI BYOK
 - **Inline charts** — One-click Bar, Line, Scatter, Pie from query results

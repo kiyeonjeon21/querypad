@@ -30,8 +30,8 @@ Layer 4  AI Analyst          →  question → semantic model → SQL → execut
 | 3 — Semantic Model | Entity rollup → `.querypad/semantic-model.yaml` (`buildSemanticModel`) | ✅ Built |
 | 4 — AI Analyst | `querypad ask`: NL → SQL (relationship-aware) → execution → insight | ✅ Built |
 | `querypad explain` | Justify each relationship from stored `RelationshipSignals` + caveats | ✅ Built |
-| UI — AI Verification | Lightweight web UI to accept/reject/edit inferred relationships | 🚧 Next |
-| MCP server | Expose `inspect`/`ask`/`explain` as typed agent tools | 🚧 Planned |
+| UI — AI Verification | Sidebar Relationships panel: accept/reject/edit inferred joins | ✅ Built |
+| MCP server | Expose `inspect`/`ask`/`explain` as typed agent tools | 🚧 Next |
 
 ## Built today
 
@@ -140,29 +140,24 @@ value overlap, name match, type match, and cardinality. It also surfaces caveats
 low-confidence edges, high-overlap/weak-name matches that may be coincidental, and tables
 with no inferred relationships. Pure consumer of artifacts (no DuckDB / AI); run `inspect` first.
 
-## UI — AI Verification (planned)
+## UI — AI Verification (built)
 
-After the CLI proves the understanding engine, build a **lightweight local web UI**
-— not Tableau, not Metabase. Its purpose is **AI verification**, not dashboard building.
-
-```text
-Left            Center        Right
-─────           ──────        ──────
-Tables          Chat          Generated SQL
-Relationships                 Results
-```
-
-The defining interaction is validating AI assumptions:
+The browser app has a **Relationships panel** in the sidebar — its purpose is
+**AI verification**, not dashboard building. It runs the same discovery engine in the
+browser (DuckDB-Wasm via `createBrowserQueryRunner`) and lets the user validate the
+AI's assumptions:
 
 ```text
 Detected relationship
-  users.id ↳ payments.user_id     Confidence 97%
-  [Accept]  [Reject]  [Edit]
+  payments.user_id ↳ users.id     Confidence 100%
+  [Accept]  [Reject]  [Edit]   (Why? → per-signal justification)
 ```
 
-This reuses the shared `src/lib/discovery` core, surfacing the same edges the CLI
-emits. The existing browser app (Monaco, charts, pipelines, sharing) remains the
-interactive-analysis surface; the verification view is additive.
+`RelationshipsPanel.tsx` reuses the shared `src/lib/discovery` core (`discoverRelationships`,
+`buildExplanation`) — the same edges the CLI emits — so no logic is duplicated. Verdicts and
+edits are keyed by `relationshipKey` and persisted to IndexedDB. The existing browser app
+(Monaco, charts, pipelines, sharing) remains the interactive-analysis surface; the
+verification view is additive.
 
 ## Claude Code integration
 

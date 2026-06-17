@@ -5,6 +5,14 @@ milestones and public product updates.
 
 ## Unreleased
 
+### Web: Relationship Verification
+
+- New Relationships panel in the sidebar: runs the same discovery engine in the browser
+  (DuckDB-Wasm) and lists inferred joins with confidence and a per-signal "why"
+- Accept / Reject / Edit each relationship to curate the AI's assumptions; verdicts and
+  edits persist across refresh (IndexedDB)
+- Reuses the engine-agnostic `src/lib/discovery` core (no logic duplicated between CLI and web)
+
 ### CLI: Dataset Understanding
 
 - New `querypad inspect <folder>` command that profiles a folder of data files and

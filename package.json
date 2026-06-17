@@ -2,7 +2,7 @@
   "name": "querypad",
   "version": "0.6.0",
   "private": true,
-  "description": "Local-first SQL scratchpad powered by DuckDB-Wasm",
+  "description": "Cursor for Data — a local-first AI workspace that understands datasets (discovers relationships, builds semantic models) and analyzes them with DuckDB.",
   "author": "QueryPad Contributors",
   "license": "MIT",
   "repository": {
@@ -14,14 +14,21 @@
     "querypad": "src/cli/index.ts"
   },
   "keywords": [
-    "sql",
+    "cursor-for-data",
     "duckdb",
+    "sql",
+    "ai",
+    "llm",
+    "data-understanding",
+    "relationship-discovery",
+    "semantic-model",
+    "schema-inference",
+    "data-analysis",
     "csv",
     "parquet",
-    "json",
-    "analytics",
-    "data-analysis",
-    "browser"
+    "cli",
+    "claude",
+    "local-first"
   ],
   "scripts": {
     "dev": "next dev",

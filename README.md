@@ -125,10 +125,16 @@ plan  payment_count  total
 paid  8              285.74
 
 Insight: All payments come from paid-plan users.
+
+Follow-up questions:
+  1. Which paid users have the highest individual payments?
+  2. Are there users with no payments at all?
+  3. How does payment frequency vary across plans?
 ```
 
-Generated SQL is read-only-gated (only `SELECT`/`WITH`/… execute) and the DB is in-memory,
-so source files are never modified. Use `--show-sql` to preview the SQL without running it.
+After the answer, `ask` suggests a few dataset-aware follow-up questions to guide the next
+step. Generated SQL is read-only-gated (only `SELECT`/`WITH`/… execute) and the DB is
+in-memory, so source files are never modified. Use `--show-sql` to preview the SQL without running it.
 
 ## CLI: explain why
 

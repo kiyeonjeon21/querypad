@@ -19,6 +19,7 @@ milestones and public product updates.
   infers foreign-key relationships with confidence scores
 - New `querypad ask "<question>" <folder>` command (AI Analyst): generates SQL using the
   inferred relationships as context, runs it on DuckDB, and explains the result
+- `ask` now suggests 2-3 follow-up questions after each answer (dataset-aware next steps)
 - `inspect` now builds a semantic model (named business entities with belongs_to/has_many)
   and writes `.querypad/semantic-model.yaml`; `ask` feeds those entities as context too
 - New `querypad explain <folder>` command: justifies each inferred relationship from its

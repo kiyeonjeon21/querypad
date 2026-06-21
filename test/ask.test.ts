@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { isReadOnlyQuery, stripSqlFences } from "../src/lib/discovery/sql-safety";
 import { buildAskContext } from "../src/lib/agent/ask-context";
-import { runAsk, type AskAi } from "../src/cli/ask";
+import { parseFollowups, runAsk, type AskAi } from "../src/cli/ask";
 import type { Relationship } from "../src/types/discovery";
 
 const REL: Relationship = {
@@ -119,4 +119,35 @@ test("runAsk --show-sql returns SQL without executing", async () => {
   assert.equal(result.sql, "SELECT 1");
   assert.equal(result.result, null);
   assert.equal(result.insight, null);
+  assert.equal(result.followups, null);
+});
+
+// ---- Follow-up suggestions -----------------------------------------------------
+
+test("parseFollowups strips bullets/numbering, trims, and caps at 3", () => {
+  const raw = "1. What is 7-day retention?\n- Which plan churns most?\n* Top spenders?\n\n4) Extra";
+  assert.deepEqual(parseFollowups(raw), [
+    "What is 7-day retention?",
+    "Which plan churns most?",
+    "Top spenders?",
+  ]);
+  assert.deepEqual(parseFollowups("   \n  \n"), []);
+});
+
+test("runAsk emits follow-up questions when the AI provides them", async () => {
+  const lines: string[] = [];
+  const followups = ["What is 7-day retention?", "Which plan churns most?"];
+  const result = await runAsk({
+    question: "total payment amount by user plan",
+    folder: "fixtures/data",
+    ai: {
+      ...stubAi(JOIN_SQL),
+      generateFollowups: async () => followups,
+    },
+    log: (line) => lines.push(line),
+  });
+  assert.deepEqual(result.followups, followups);
+  const out = lines.join("\n");
+  assert.ok(out.includes("Follow-up questions:"));
+  assert.ok(out.includes("1. What is 7-day retention?"));
 });

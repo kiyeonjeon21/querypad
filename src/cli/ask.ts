@@ -14,10 +14,27 @@ import { renderTable } from "./render";
 
 const ANALYST_SYSTEM_PROMPT = `You are a data analyst. Given a question, the SQL that was run, and a sample of the result rows, state the answer as a concise 1-3 sentence finding. No preamble, do not restate the SQL, do not apologize.`;
 
+const FOLLOWUP_SYSTEM_PROMPT = `You are a data analyst. Given the user's question, the SQL, a sample of results, and the dataset's tables and relationships, propose 2-3 sharp follow-up questions a curious analyst would ask next. Output ONLY the questions, one per line, no numbering, no bullets, no preamble.`;
+
+/** Parse model follow-up output into a clean list (strip bullets/numbering, cap at 3). */
+export function parseFollowups(text: string): string[] {
+  return text
+    .split("\n")
+    .map((line) => line.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "").trim())
+    .filter(Boolean)
+    .slice(0, 3);
+}
+
 /** Injectable AI surface so the pipeline can be tested without network calls. */
 export interface AskAi {
   generateSql(input: { context: string; question: string }): Promise<string>;
   generateInsight(input: { question: string; sql: string; sample: string }): Promise<string>;
+  generateFollowups?(input: {
+    question: string;
+    sql: string;
+    sample: string;
+    context: string;
+  }): Promise<string[]>;
 }
 
 export interface RunAskOptions {
@@ -34,6 +51,7 @@ export interface AskResult {
   sql: string;
   result: QueryResultRows | null;
   insight: string | null;
+  followups: string[] | null;
 }
 
 function realAi(provider: string | undefined): AskAi {
@@ -54,6 +72,14 @@ function realAi(provider: string | undefined): AskAi {
         input: `Question: ${question}\n\nSQL:\n${sql}\n\nResult sample:\n${sample}`,
         maxTokens: 300,
       }),
+    generateFollowups: ({ question, sql, sample, context }) =>
+      complete({
+        provider: creds.provider,
+        apiKey: creds.apiKey,
+        system: FOLLOWUP_SYSTEM_PROMPT,
+        input: `${context}\n\nQuestion: ${question}\n\nSQL:\n${sql}\n\nResult sample:\n${sample}`,
+        maxTokens: 300,
+      }).then(parseFollowups),
   };
 }
 
@@ -96,7 +122,7 @@ export async function runAsk(options: RunAskOptions): Promise<AskResult> {
     log(sql);
 
     if (options.showSql) {
-      return { sql, result: null, insight: null };
+      return { sql, result: null, insight: null, followups: null };
     }
 
     if (!isReadOnlyQuery(sql)) {
@@ -107,15 +133,22 @@ export async function runAsk(options: RunAskOptions): Promise<AskResult> {
     log("");
     log(renderTable(result));
 
-    const insight = await ai.generateInsight({
-      question: options.question,
-      sql,
-      sample: renderTable(result, 20),
-    });
+    const sample = renderTable(result, 20);
+    const insight = await ai.generateInsight({ question: options.question, sql, sample });
     log("");
     log(`Insight: ${insight.trim()}`);
 
-    return { sql, result, insight };
+    let followups: string[] | null = null;
+    if (ai.generateFollowups) {
+      followups = await ai.generateFollowups({ question: options.question, sql, sample, context });
+      if (followups.length > 0) {
+        log("");
+        log("Follow-up questions:");
+        followups.forEach((q, i) => log(`  ${i + 1}. ${q}`));
+      }
+    }
+
+    return { sql, result, insight, followups };
   } finally {
     db.close();
   }

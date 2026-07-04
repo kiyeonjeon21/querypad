@@ -173,3 +173,99 @@ export async function complete(options: CompleteOptions): Promise<string> {
   for await (const chunk of streamComplete(options)) out += chunk;
   return out;
 }
+
+// ---- Tool-use (agent loop) ----------------------------------------------------
+
+/** A tool the model may call, in Anthropic's `tools` schema. */
+export interface ToolDefinition {
+  name: string;
+  description: string;
+  input_schema: Record<string, unknown>;
+}
+
+export interface TextBlock {
+  type: "text";
+  text: string;
+}
+
+export interface ToolUseBlock {
+  type: "tool_use";
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
+}
+
+/** An assistant content block returned by the model (text or a tool call). */
+export type ContentBlock = TextBlock | ToolUseBlock | { type: string; [key: string]: unknown };
+
+/** The result of executing a tool, fed back to the model on the next turn. */
+export interface ToolResultBlock {
+  type: "tool_result";
+  tool_use_id: string;
+  content: string;
+  is_error?: boolean;
+}
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string | Array<ContentBlock | ToolResultBlock>;
+}
+
+export interface CompleteWithToolsOptions {
+  provider: AiProvider;
+  apiKey: string;
+  system: string;
+  messages: ChatMessage[];
+  tools: ToolDefinition[];
+  maxTokens?: number;
+}
+
+export interface ToolCompletion {
+  stopReason: string | null;
+  /** Assistant content blocks (text + tool_use), passed back verbatim next turn. */
+  content: ContentBlock[];
+}
+
+/**
+ * One non-streaming turn of a tool-using conversation (Anthropic Messages API).
+ * Returns the assistant's content blocks so the caller can drive the agent loop.
+ * Anthropic-first; the default CLI provider. (OpenAI tool path not yet wired.)
+ */
+export async function completeWithTools({
+  provider,
+  apiKey,
+  system,
+  messages,
+  tools,
+  maxTokens = 1024,
+}: CompleteWithToolsOptions): Promise<ToolCompletion> {
+  if (provider !== "anthropic") {
+    throw new Error("Agent mode currently supports the anthropic provider only.");
+  }
+
+  const config = getAiProviderConfig("anthropic");
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
+    },
+    body: JSON.stringify({
+      model: config.model,
+      max_tokens: maxTokens,
+      system,
+      tools,
+      messages,
+    }),
+  });
+
+  if (!response.ok) throw httpError(response.status, await response.text());
+
+  const data = (await response.json()) as {
+    stop_reason?: string | null;
+    content?: ContentBlock[];
+  };
+  return { stopReason: data.stop_reason ?? null, content: data.content ?? [] };
+}

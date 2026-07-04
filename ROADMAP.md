@@ -28,10 +28,10 @@ Layer 4  AI Analyst          →  question → semantic model → SQL → execut
 | 1 — Dataset Discovery | Folder scan + per-column profiles (`profileTable`, `loadFolder`) | ✅ Built |
 | 2 — Relationship Discovery | Confidence-scored FK inference (`discoverRelationships`, `querypad inspect`) | ✅ Built |
 | 3 — Semantic Model | Entity rollup → `.querypad/semantic-model.yaml` (`buildSemanticModel`) | ✅ Built |
-| 4 — AI Analyst | `querypad ask`: NL → SQL (relationship-aware) → execution → insight | ✅ Built |
+| 4 — AI Analyst | `querypad ask`: NL → agentic tool-using loop (explore → SQL → self-correct → insight) | ✅ Built |
 | `querypad explain` | Justify each relationship from stored `RelationshipSignals` + caveats | ✅ Built |
 | UI — AI Verification | Sidebar Relationships panel: accept/reject/edit inferred joins | ✅ Built |
-| MCP server | Expose `inspect`/`ask`/`explain` as typed agent tools | 🚧 Next |
+| MCP server | Expose `inspect`/`ask`/`explain` as typed agent tools | 🚧 Planned (step 5 below) |
 
 ## Built today
 
@@ -114,23 +114,44 @@ entities:
 - Future: AI/user-curated renames (e.g. `users` → `Customer`) over the mechanical defaults.
 - Surface conflicts (ambiguous joins, multiple FK candidates) for resolution.
 
-## Layer 4 — AI Analyst (built)
+## Layer 4 — AI Analyst (built, agentic)
 
 ```bash
 querypad ask "show 7-day retention for paid users" ./data
 ```
 
 ```text
-Question → inferred relationships as context → SQL generation → DuckDB execution → insight
+Question → grounded in relationships → agent loop { list/describe/sample → run_sql → observe → self-correct } → insight
 ```
 
-- Reuses the AI layer (`src/lib/ai/complete.ts`, Claude + OpenAI). CLI keys come from
-  `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`; provider via `--provider`.
-- Feeds the inferred relationships and the semantic model's entities (`buildAskContext`)
-  so generated SQL joins on the right keys and is reasoned in domain terms.
-- Generated SQL is read-only-gated (`isReadOnlyQuery`) and code-fence stripped before
-  execution; the in-memory DB is reloaded from files each run, so sources are never touched.
-- `--show-sql` previews the SQL without executing.
+- An **agentic observe-act loop** (`src/lib/agent/loop.ts`, `runAgentQuery`): the model calls
+  read-only tools (`list_tables`, `describe_table`, `sample_table`, `run_sql`), reads their
+  output — including DB errors — and rewrites failing SQL until it converges (bounded by
+  `--steps`, default 8). Engine-agnostic via the shared `QueryRunner`, so it runs on the
+  Node native binding today and DuckDB-Wasm later.
+- Grounded in the inferred relationships and the semantic model's entities (`buildAskContext`),
+  the market-standard anti-hallucination surface — the agent joins on the right keys and
+  reasons in domain terms.
+- Every tool is read-only-gated (`isReadOnlyQuery`); the in-memory DB is reloaded from files
+  each run, so sources are never touched. Anthropic-first (`completeWithTools`); OpenAI falls
+  back to a single-shot pipeline. `--verbose` shows each tool step; `--show-sql` previews a
+  single query without executing.
+
+## Next — deepening the agent (product renaming to **Grain**)
+
+Direction set from late-2025/2026 market research (competitive landscape, agentic
+architecture, naming). The moat is **semantic-first + local-first**: an agent grounded in a
+governed semantic model is reliable where naked text-to-SQL is not, and almost every funded
+competitor is cloud/warehouse-native. Build one step at a time:
+
+1. **Agentic `ask` loop** — self-correcting, tool-using. ✅ Built (above).
+2. Semantic-grounding hardening + a verification step before answering.
+3. Short planning/decomposition for multi-part questions (bounded).
+4. Eval harness (question → expected-result pairs; execution-comparison grading).
+5. **MCP server** — expose the read-only DuckDB tools to Claude Code / Cursor.
+6. **Rename to Grain** (package / bin / `.querypad` dir / domain / README) — *gated on formal
+   trademark + domain clearance* (the name "datapad" was rejected: it collides with an active,
+   funded competitor in the same category).
 
 ## `querypad explain` (built)
 

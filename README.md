@@ -100,7 +100,7 @@ don't produce false positives.
 | **1 — Dataset Discovery** | Scan folders; detect schema, types, statistics, uniqueness, cardinality | ✅ Built (`profile`) |
 | **2 — Relationship Discovery** | Infer joins automatically with confidence scores | ✅ Built (`inspect`) |
 | **3 — Semantic Model** | Roll relationships into named business entities (`User ├ Payment ├ Event`) | ✅ Built (`inspect`) |
-| **4 — AI Analyst** | Natural-language questions → SQL → execution → insight (`ask`) | ✅ Built (`ask`) |
+| **4 — AI Analyst** | Natural-language questions → agentic tool-using loop (explore → SQL → self-correct → insight) (`ask`) | ✅ Built (`ask`) |
 
 See [ROADMAP.md](ROADMAP.md) for the full plan.
 
@@ -111,8 +111,9 @@ export ANTHROPIC_API_KEY=sk-ant-...        # or OPENAI_API_KEY with --provider o
 querypad ask "total payment amount by user plan" ./data
 ```
 
-`ask` builds context from the inferred relationships (so the generated SQL joins on the
-right keys), runs it on DuckDB, and explains the result:
+`ask` runs an **agentic loop**: grounded in the inferred relationships, it explores the
+schema with read-only tools (`list_tables`, `describe_table`, `sample_table`, `run_sql`),
+executes SQL on DuckDB, **self-corrects** when a query errors, and explains the result:
 
 ```text
 -- SQL
@@ -125,10 +126,18 @@ plan  payment_count  total
 paid  8              285.74
 
 Insight: All payments come from paid-plan users.
+
+Follow-up questions:
+  1. Which paid users have the highest individual payments?
+  2. Are there users with no payments at all?
+  3. How does payment frequency vary across plans?
 ```
 
-Generated SQL is read-only-gated (only `SELECT`/`WITH`/… execute) and the DB is in-memory,
-so source files are never modified. Use `--show-sql` to preview the SQL without running it.
+After the answer, `ask` suggests a few dataset-aware follow-up questions to guide the next
+step. Every tool is read-only-gated (only `SELECT`/`WITH`/… execute) and the DB is
+in-memory, so source files are never modified. The agent loop is Anthropic-first
+(OpenAI falls back to a single-shot pipeline). Use `--verbose` to see each tool step,
+`--steps <n>` to cap the turns, or `--show-sql` to preview a single query without running it.
 
 ## CLI: explain why
 

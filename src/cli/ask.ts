@@ -128,21 +128,23 @@ export async function runAsk(options: RunAskOptions): Promise<AskResult> {
 
     // Prefer cached .querypad/ artifacts; otherwise profile + discover on the fly.
     const cached = await readArtifacts(options.folder);
+    const now = Date.now();
+    let profiles = cached.profiles ?? undefined;
     let relationships: Relationship[];
     if (cached.relationships) {
       relationships = cached.relationships;
     } else {
-      const now = Date.now();
-      const profiles =
-        cached.profiles ??
-        (await Promise.all(tables.map((table) => profileTable(table, db.runner, now))));
+      profiles =
+        profiles ?? (await Promise.all(tables.map((table) => profileTable(table, db.runner, now))));
       relationships = await discoverRelationships(profiles, db.runner);
     }
 
+    // Profiles enrich the model with dimensions/measures; undefined → entities only.
     const semanticModel = buildSemanticModel(
       tables.map((table) => table.name),
       relationships,
-      Date.now()
+      now,
+      profiles
     );
     const context = buildAskContext({ tables, relationships, semanticModel });
 

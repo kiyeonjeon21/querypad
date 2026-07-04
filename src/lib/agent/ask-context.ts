@@ -23,16 +23,25 @@ function renderRelationships(relationships: Relationship[]): string {
 
 /** Render the business entities so the model can reason in domain terms. */
 function renderEntities(model: SemanticModel): string {
-  const lines = model.entities.map((entity) => {
+  const blocks = model.entities.map((entity) => {
     const assoc = [
       entity.belongsTo.length > 0 ? `belongs_to ${entity.belongsTo.join(", ")}` : null,
       entity.hasMany.length > 0 ? `has_many ${entity.hasMany.join(", ")}` : null,
       entity.hasOne.length > 0 ? `has_one ${entity.hasOne.join(", ")}` : null,
     ].filter(Boolean);
     const detail = assoc.length > 0 ? ` ${assoc.join(", ")}` : "";
-    return `- ${entity.name} (table ${entity.table})${detail}`;
+    const lines = [`- ${entity.name} (table ${entity.table})${detail}`];
+    if (entity.dimensions.length > 0) {
+      const dims = entity.dimensions.map((d) => `${d.name} (${d.kind})`).join(", ");
+      lines.push(`    dimensions: ${dims}`);
+    }
+    if (entity.measures.length > 0) {
+      const measures = entity.measures.map((m) => `${m.name} (${m.agg})`).join(", ");
+      lines.push(`    measures: ${measures}`);
+    }
+    return lines.join("\n");
   });
-  return lines.join("\n");
+  return blocks.join("\n");
 }
 
 /**

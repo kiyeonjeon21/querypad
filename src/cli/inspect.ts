@@ -43,7 +43,8 @@ export async function runInspect(folder: string, now: number): Promise<Discovery
     const semanticModel = buildSemanticModel(
       profiles.map((profile) => profile.tableName),
       relationships,
-      now
+      now,
+      profiles
     );
 
     const report: DiscoveryReport = { generatedAt: now, profiles, relationships, semanticModel };

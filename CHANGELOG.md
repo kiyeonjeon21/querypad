@@ -24,6 +24,9 @@ milestones and public product updates.
 - `ask` now suggests 2-3 follow-up questions after each answer (dataset-aware next steps)
 - `inspect` now builds a semantic model (named business entities with belongs_to/has_many)
   and writes `.querypad/semantic-model.yaml`; `ask` feeds those entities as context too
+- the semantic model now carries mechanically-derived **dimensions**, **measures**, and
+  **synonyms** per entity (deterministic, no AI) — the agent is grounded in what you group
+  by and the metrics that exist, the top text-to-SQL accuracy lever
 - New `querypad explain <folder>` command: justifies each inferred relationship from its
   signals (value overlap, name match, type, cardinality) and lists caveats to verify
 - Generated SQL is read-only-gated (only SELECT/WITH/EXPLAIN/… execute) and code-fence stripped

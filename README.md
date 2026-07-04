@@ -122,9 +122,12 @@ export ANTHROPIC_API_KEY=sk-ant-...        # or OPENAI_API_KEY with --provider o
 querypad ask "total payment amount by user plan" ./data
 ```
 
-`ask` runs an **agentic loop**: grounded in the inferred relationships, it explores the
-schema with read-only tools (`list_tables`, `describe_table`, `sample_table`, `run_sql`),
-executes SQL on DuckDB, **self-corrects** when a query errors, and explains the result:
+`ask` runs an **agentic loop**: grounded in the inferred relationships and the semantic
+model, it explores the schema with read-only tools (`list_tables`, `describe_table`,
+`sample_table`, `run_sql`) and can compute a defined metric with **`query_metric`** — a
+deterministic compiler that turns a metric + dimensions + filters into correct,
+join-guarded SQL (many-to-one joins only; a grouping that would fan out the measure is
+refused). It executes on DuckDB, **self-corrects** when a query errors, and explains the result:
 
 ```text
 -- SQL

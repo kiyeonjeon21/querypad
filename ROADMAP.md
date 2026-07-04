@@ -139,10 +139,11 @@ Question → grounded in relationships → agent loop { list/describe/sample →
 ```
 
 - An **agentic observe-act loop** (`src/lib/agent/loop.ts`, `runAgentQuery`): the model calls
-  read-only tools (`list_tables`, `describe_table`, `sample_table`, `run_sql`), reads their
-  output — including DB errors — and rewrites failing SQL until it converges (bounded by
-  `--steps`, default 8). Engine-agnostic via the shared `QueryRunner`, so it runs on the
-  Node native binding today and DuckDB-Wasm later.
+  read-only tools (`list_tables`, `describe_table`, `sample_table`, `run_sql`, and
+  `query_metric` — a deterministic metric compiler, `src/lib/discovery/compile-metric.ts`),
+  reads their output — including DB errors — and rewrites failing SQL until it converges
+  (bounded by `--steps`, default 8). Engine-agnostic via the shared `QueryRunner`, so it runs
+  on the Node native binding today and DuckDB-Wasm later.
 - Grounded in the inferred relationships and the semantic model's entities (`buildAskContext`),
   the market-standard anti-hallucination surface — the agent joins on the right keys and
   reasons in domain terms.
@@ -164,7 +165,7 @@ competitor is cloud/warehouse-native. Build one step at a time:
    1. **Model schema + mechanical enrichment** — dimensions / measures / synonyms per entity,
       deterministically from the profiles (no AI). ✅ Built.
    2. Metric compiler + `query_metric` agent tool (pragmatic guarded joins) — the agent queries
-      defined metrics, not raw tables.
+      defined metrics, not raw tables. ✅ Built.
    3. Hybrid term-resolution index (`fts` BM25 + cosine + RRF, all in DuckDB; embeddings via
       local Transformers.js, BYOK API as an upgrade) — NL terms → entity/column/metric.
    4. Any-doc-in glossary ingestion (loaders → schema-grounded LLM extraction → reviewable diff).

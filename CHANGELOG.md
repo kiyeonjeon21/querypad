@@ -27,6 +27,10 @@ milestones and public product updates.
 - the semantic model now carries mechanically-derived **dimensions**, **measures**, and
   **synonyms** per entity (deterministic, no AI) — the agent is grounded in what you group
   by and the metrics that exist, the top text-to-SQL accuracy lever
+- `ask`'s agent gained a **`query_metric`** tool: a deterministic compiler turns a defined
+  metric + dimensions + filters into correct, **join-guarded** SQL (many-to-one joins only;
+  a grouping that would fan out the measure is refused) — the agent queries the semantic
+  layer instead of hand-writing every aggregation
 - New `querypad explain <folder>` command: justifies each inferred relationship from its
   signals (value overlap, name match, type, cardinality) and lists caveats to verify
 - Generated SQL is read-only-gated (only SELECT/WITH/EXPLAIN/… execute) and code-fence stripped

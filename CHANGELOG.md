@@ -17,8 +17,10 @@ milestones and public product updates.
 
 - New `querypad inspect <folder>` command that profiles a folder of data files and
   infers foreign-key relationships with confidence scores
-- New `querypad ask "<question>" <folder>` command (AI Analyst): generates SQL using the
-  inferred relationships as context, runs it on DuckDB, and explains the result
+- New `querypad ask "<question>" <folder>` command (AI Analyst): an agentic loop explores
+  the schema with read-only tools (`list_tables`/`describe_table`/`sample_table`/`run_sql`),
+  runs SQL on DuckDB, self-corrects on errors, and explains the result — grounded in the
+  inferred relationships (`--verbose` shows each tool step, `--steps` caps the turns)
 - `ask` now suggests 2-3 follow-up questions after each answer (dataset-aware next steps)
 - `inspect` now builds a semantic model (named business entities with belongs_to/has_many)
   and writes `.querypad/semantic-model.yaml`; `ask` feeds those entities as context too

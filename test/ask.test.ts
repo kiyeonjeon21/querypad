@@ -3,6 +3,8 @@ import test from "node:test";
 import { isReadOnlyQuery, stripSqlFences } from "../src/lib/discovery/sql-safety";
 import { buildAskContext } from "../src/lib/agent/ask-context";
 import { parseFollowups, runAsk, type AskAi } from "../src/cli/ask";
+import type { AgentComplete } from "../src/lib/agent/loop";
+import type { ToolCompletion } from "../src/lib/ai/complete";
 import type { Relationship } from "../src/types/discovery";
 
 const REL: Relationship = {
@@ -150,4 +152,95 @@ test("runAsk emits follow-up questions when the AI provides them", async () => {
   const out = lines.join("\n");
   assert.ok(out.includes("Follow-up questions:"));
   assert.ok(out.includes("1. What is 7-day retention?"));
+});
+
+// ---- Agentic loop (scripted model, real DuckDB runner, no network) -------------
+
+function toolUse(id: string, name: string, input: Record<string, unknown>): ToolCompletion {
+  return { stopReason: "tool_use", content: [{ type: "tool_use", id, name, input }] };
+}
+
+function textReply(text: string): ToolCompletion {
+  return { stopReason: "end_turn", content: [{ type: "text", text }] };
+}
+
+/** Replay a fixed script of model turns; the loop drives real tool execution. */
+function scriptedAgent(script: ToolCompletion[]): AgentComplete {
+  let i = 0;
+  return async () => script[Math.min(i++, script.length - 1)];
+}
+
+function agentAi(script: ToolCompletion[], extra?: Partial<AskAi>): AskAi {
+  return {
+    generateSql: async () => {
+      throw new Error("generateSql must not be called in agent mode");
+    },
+    generateInsight: async () => {
+      throw new Error("generateInsight must not be called in agent mode");
+    },
+    agentComplete: scriptedAgent(script),
+    ...extra,
+  };
+}
+
+test("agent loop self-corrects a failing query, then converges on the answer", async () => {
+  const lines: string[] = [];
+  const result = await runAsk({
+    question: "total payment amount by user plan",
+    folder: "fixtures/data",
+    ai: agentAi([
+      toolUse("t1", "run_sql", { query: "SELECT nonexistent_col FROM users" }),
+      toolUse("t2", "run_sql", { query: JOIN_SQL }),
+      textReply("All payments come from paid-plan users."),
+    ]),
+    log: (line) => lines.push(line),
+  });
+
+  // Both attempts were recorded; the first failed, the second succeeded.
+  assert.deepEqual(result.agent?.sqlHistory, [
+    "SELECT nonexistent_col FROM users",
+    JOIN_SQL,
+  ]);
+  assert.equal(result.agent?.steps[0].isError, true);
+  assert.equal(result.agent?.steps[1].isError, false);
+
+  // Final grounded answer surfaces through insight + the last result table.
+  assert.equal(result.insight, "All payments come from paid-plan users.");
+  assert.equal(result.agent?.answer, "All payments come from paid-plan users.");
+  assert.deepEqual(result.result?.columns, ["plan", "payment_count", "total"]);
+  assert.equal(result.result?.rows.length, 1);
+  assert.equal(String(result.result?.rows[0].plan), "paid");
+  assert.equal(Number(result.result?.rows[0].payment_count), 8);
+
+  const out = lines.join("\n");
+  assert.ok(out.includes("-- SQL"));
+  assert.ok(out.includes("Insight:"));
+});
+
+test("agent loop refuses non-read-only SQL and never executes it", async () => {
+  const result = await runAsk({
+    question: "delete everything",
+    folder: "fixtures/data",
+    ai: agentAi([
+      toolUse("t1", "run_sql", { query: "DROP TABLE users" }),
+      textReply("I cannot modify the data; it is read-only."),
+    ]),
+    log: () => {},
+  });
+
+  assert.deepEqual(result.agent?.sqlHistory, ["DROP TABLE users"]);
+  assert.match(result.agent?.steps[0].output ?? "", /read-only/i);
+  // Refused query produced no result rows.
+  assert.equal(result.result, null);
+});
+
+test("agent mode is skipped when the AI has no agentComplete (single-shot fallback)", async () => {
+  const result = await runAsk({
+    question: "total payment amount by user plan",
+    folder: "fixtures/data",
+    ai: stubAi(JOIN_SQL),
+    log: () => {},
+  });
+  assert.equal(result.agent, null);
+  assert.equal(result.result?.rows.length, 1);
 });

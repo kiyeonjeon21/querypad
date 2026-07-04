@@ -1,6 +1,12 @@
-import { complete } from "../lib/ai/complete";
+import { complete, completeWithTools } from "../lib/ai/complete";
 import { SQL_SYSTEM_PROMPT, buildSqlInput } from "../lib/ai/generate-sql";
 import { buildAskContext } from "../lib/agent/ask-context";
+import {
+  runAgentQuery,
+  type AgentComplete,
+  type AgentQueryResult,
+  type AgentStep,
+} from "../lib/agent/loop";
 import { discoverRelationships } from "../lib/discovery/relationships";
 import { buildSemanticModel } from "../lib/discovery/semantic-model";
 import { isReadOnlyQuery, stripSqlFences } from "../lib/discovery/sql-safety";
@@ -35,6 +41,8 @@ export interface AskAi {
     sample: string;
     context: string;
   }): Promise<string[]>;
+  /** When present, `ask` runs an agentic tool-using loop instead of single-shot. */
+  agentComplete?: AgentComplete;
 }
 
 export interface RunAskOptions {
@@ -42,6 +50,10 @@ export interface RunAskOptions {
   folder: string;
   provider?: string;
   showSql?: boolean;
+  /** Max tool-using turns for the agent loop (default 8). */
+  maxSteps?: number;
+  /** Print each agent tool step. */
+  verbose?: boolean;
   /** Injected in tests; built from env credentials otherwise. */
   ai?: AskAi;
   log?: (line: string) => void;
@@ -52,11 +64,13 @@ export interface AskResult {
   result: QueryResultRows | null;
   insight: string | null;
   followups: string[] | null;
+  /** Populated in agent mode; null for single-shot / --show-sql. */
+  agent: AgentQueryResult | null;
 }
 
 function realAi(provider: string | undefined): AskAi {
   const creds = resolveAiCredentials(provider);
-  return {
+  const ai: AskAi = {
     generateSql: ({ context, question }) =>
       complete({
         provider: creds.provider,
@@ -81,6 +95,21 @@ function realAi(provider: string | undefined): AskAi {
         maxTokens: 300,
       }).then(parseFollowups),
   };
+
+  // Agent mode is Anthropic-first; OpenAI falls back to the single-shot pipeline.
+  if (creds.provider === "anthropic") {
+    ai.agentComplete = ({ system, messages, tools, maxTokens }) =>
+      completeWithTools({
+        provider: creds.provider,
+        apiKey: creds.apiKey,
+        system,
+        messages,
+        tools,
+        maxTokens,
+      });
+  }
+
+  return ai;
 }
 
 export async function runAsk(options: RunAskOptions): Promise<AskResult> {
@@ -116,14 +145,51 @@ export async function runAsk(options: RunAskOptions): Promise<AskResult> {
       Date.now()
     );
     const context = buildAskContext({ tables, relationships, semanticModel });
-    const sql = stripSqlFences(await ai.generateSql({ context, question: options.question }));
 
+    // --show-sql: generate a single query and print it without executing.
+    if (options.showSql) {
+      const sql = stripSqlFences(await ai.generateSql({ context, question: options.question }));
+      log("-- SQL");
+      log(sql);
+      return { sql, result: null, insight: null, followups: null, agent: null };
+    }
+
+    // Agent mode: a tool-using, self-correcting loop over the read-only DuckDB.
+    if (ai.agentComplete) {
+      const agent = await runAgentQuery({
+        question: options.question,
+        context,
+        tables,
+        runner: db.runner,
+        complete: ai.agentComplete,
+        maxSteps: options.maxSteps,
+        onStep: options.verbose ? (step) => log(formatStep(step)) : undefined,
+      });
+
+      const sql = agent.sqlHistory[agent.sqlHistory.length - 1] ?? "";
+      log("-- SQL");
+      log(sql || "(no SQL executed)");
+      if (agent.lastResult) {
+        log("");
+        log(renderTable(agent.lastResult));
+      }
+      log("");
+      log(`Insight: ${agent.answer.trim()}`);
+
+      const followups = await emitFollowups(ai, log, {
+        question: options.question,
+        sql,
+        sample: agent.lastResult ? renderTable(agent.lastResult, 20) : "",
+        context,
+      });
+
+      return { sql, result: agent.lastResult, insight: agent.answer, followups, agent };
+    }
+
+    // Single-shot fallback: generate SQL, execute, explain.
+    const sql = stripSqlFences(await ai.generateSql({ context, question: options.question }));
     log("-- SQL");
     log(sql);
-
-    if (options.showSql) {
-      return { sql, result: null, insight: null, followups: null };
-    }
 
     if (!isReadOnlyQuery(sql)) {
       throw new Error(`Refusing to execute non-read-only SQL:\n${sql}`);
@@ -138,18 +204,41 @@ export async function runAsk(options: RunAskOptions): Promise<AskResult> {
     log("");
     log(`Insight: ${insight.trim()}`);
 
-    let followups: string[] | null = null;
-    if (ai.generateFollowups) {
-      followups = await ai.generateFollowups({ question: options.question, sql, sample, context });
-      if (followups.length > 0) {
-        log("");
-        log("Follow-up questions:");
-        followups.forEach((q, i) => log(`  ${i + 1}. ${q}`));
-      }
-    }
+    const followups = await emitFollowups(ai, log, {
+      question: options.question,
+      sql,
+      sample,
+      context,
+    });
 
-    return { sql, result, insight, followups };
+    return { sql, result, insight, followups, agent: null };
   } finally {
     db.close();
   }
+}
+
+/** Render one agent tool step for --verbose output. */
+function formatStep(step: AgentStep): string {
+  const arg =
+    step.tool === "run_sql"
+      ? String(step.input.query ?? "")
+      : JSON.stringify(step.input);
+  const status = step.isError ? " [error]" : "";
+  return `→ ${step.tool}${status}: ${arg}`;
+}
+
+/** Request follow-up questions (when supported) and print them. Returns the list or null. */
+async function emitFollowups(
+  ai: AskAi,
+  log: (line: string) => void,
+  input: { question: string; sql: string; sample: string; context: string }
+): Promise<string[] | null> {
+  if (!ai.generateFollowups) return null;
+  const followups = await ai.generateFollowups(input);
+  if (followups.length > 0) {
+    log("");
+    log("Follow-up questions:");
+    followups.forEach((q, i) => log(`  ${i + 1}. ${q}`));
+  }
+  return followups;
 }

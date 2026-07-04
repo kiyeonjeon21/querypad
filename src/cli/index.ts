@@ -9,15 +9,19 @@ Usage:
   querypad inspect [folder]        Profile a folder of data files and infer relationships
                                    (writes .querypad/ artifacts). Defaults to the current directory.
   querypad ask "<question>" [folder]
-                                   Answer a natural-language question: generate SQL using the
-                                   inferred relationships, run it, and explain the result.
+                                   Answer a natural-language question: an agentic loop explores
+                                   the schema, runs read-only SQL (self-correcting on errors),
+                                   and explains the result — grounded in the inferred relationships.
   querypad explain [folder]        Justify each inferred relationship from its signals,
                                    with caveats to verify (reads .querypad/; run inspect first).
   querypad help                    Show this help
 
 Options for ask:
   --provider <anthropic|openai>    AI provider (default: anthropic, or QUERYPAD_AI_PROVIDER)
+                                   (agent mode is Anthropic-first; OpenAI uses single-shot)
   --show-sql                       Print the generated SQL without executing
+  --steps <n>                      Max agent tool-using turns (default: 8)
+  --verbose                        Print each agent tool step
 
 Environment: ANTHROPIC_API_KEY or OPENAI_API_KEY for the chosen provider.
 Supported file types: .parquet, .csv, .tsv, .json, .jsonl, .ndjson
@@ -72,11 +76,14 @@ async function main(argv: string[]): Promise<number> {
         console.error(HELP);
         return 1;
       }
+      const steps = typeof flags.steps === "string" ? Number(flags.steps) : undefined;
       await runAsk({
         question,
         folder: positionals[1] ?? ".",
         provider: typeof flags.provider === "string" ? flags.provider : undefined,
         showSql: flags["show-sql"] === true,
+        maxSteps: steps && Number.isFinite(steps) ? steps : undefined,
+        verbose: flags.verbose === true,
       });
       return 0;
     }

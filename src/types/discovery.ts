@@ -34,12 +34,39 @@ export interface Relationship {
   signals: RelationshipSignals;
 }
 
+/** A groupable/filterable attribute of an entity, derived from a column. */
+export interface SemanticDimension {
+  /** Dimension name (usually the column name). */
+  name: string;
+  column: string;
+  kind: "categorical" | "time" | "numeric" | "boolean";
+  /** Time dimensions only: the natural rollup grain. */
+  grain?: "day" | "month" | "year";
+  /** Categorical dimensions only, when the value set is small. */
+  values?: string[];
+}
+
+/** A named aggregation over an entity. `count` omits `column`. */
+export interface SemanticMeasure {
+  name: string;
+  agg: "count" | "sum";
+  column?: string;
+}
+
 /** A named business entity derived from a table and its relationships. */
 export interface SemanticEntity {
   /** PascalCase singular, e.g. "User". */
   name: string;
   /** Source table, e.g. "users". */
   table: string;
+  /** Human/AI-authored description (empty until enriched). */
+  description?: string;
+  /** Alternative surface terms for this entity (for term resolution). */
+  synonyms: string[];
+  /** Groupable/filterable attributes derived from the table's columns. */
+  dimensions: SemanticDimension[];
+  /** Aggregations available over this entity. */
+  measures: SemanticMeasure[];
   /** Entity names this entity references (foreign-key side). */
   belongsTo: string[];
   /** Entity names that reference this one with a many-to-one relationship. */

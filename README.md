@@ -65,16 +65,27 @@ read to reason about the dataset instead of guessing at pandas:
   inspect-summary.md   # human- and agent-readable overview
 ```
 
-`inspect` also rolls the relationships into a semantic model of named entities:
+`inspect` also rolls the relationships into a semantic model of named entities —
+with mechanically-derived **dimensions**, **measures**, and **synonyms** (deterministic,
+no AI) so the agent is grounded in what you group by and the metrics that exist:
 
 ```yaml
 # .querypad/semantic-model.yaml
 entities:
   - name: User
     table: users
+    synonyms: [users, user]
+    dimensions:
+      - {name: plan, column: plan, kind: categorical, values: [paid, free]}
+    measures:
+      - {name: users_count, agg: count}
     has_many: [Payment, Event]
   - name: Payment
     table: payments
+    synonyms: [payments, payment]
+    measures:
+      - {name: payments_count, agg: count}
+      - {name: sum_amount, agg: sum, column: amount}
     belongs_to: [User]
 ```
 

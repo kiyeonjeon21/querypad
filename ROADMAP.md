@@ -96,11 +96,20 @@ Rolls inferred relationships into named business entities, stored as the source 
 entities:
   - name: User
     table: users
+    synonyms: [users, user]
+    dimensions:
+      - {name: plan, column: plan, kind: categorical, values: [paid, free]}
+    measures:
+      - {name: users_count, agg: count}
     has_many:
       - Payment
       - Event
   - name: Payment
     table: payments
+    synonyms: [payments, payment]
+    measures:
+      - {name: payments_count, agg: count}
+      - {name: sum_amount, agg: sum, column: amount}
     belongs_to:
       - User
 ```
@@ -110,9 +119,14 @@ entities:
   This keeps `inspect` key-free and deterministic.
 - Associations come from the relationship graph: FK side `belongs_to`, PK side `has_many`
   (or `has_one` for one-to-one).
-- `ask` feeds the entities into its context so generated SQL is reasoned in domain terms.
-- Future: AI/user-curated renames (e.g. `users` → `Customer`) over the mechanical defaults.
-- Surface conflicts (ambiguous joins, multiple FK candidates) for resolution.
+- **Dimensions / measures / synonyms** are derived mechanically from the column profiles
+  (no AI): date → time dimension, low-cardinality text/boolean → categorical (with values),
+  numeric non-key → `sum`, plus a row `count`; keys (relationship endpoints, id-named
+  columns) are excluded. This is the deterministic floor the agent is grounded in.
+- `ask` feeds the entities — with their dimensions and measures — into its context so
+  generated SQL is reasoned in domain terms.
+- Future: AI-enriched descriptions/synonyms/business metrics, then user-curated renames
+  (e.g. `users` → `Customer`) over the mechanical defaults; surface ambiguous-join conflicts.
 
 ## Layer 4 — AI Analyst (built, agentic)
 
@@ -144,10 +158,19 @@ architecture, naming). The moat is **semantic-first + local-first**: an agent gr
 governed semantic model is reliable where naked text-to-SQL is not, and almost every funded
 competitor is cloud/warehouse-native. Build one step at a time:
 
-1. **Agentic `ask` loop** — self-correcting, tool-using. ✅ Built (above).
-2. Semantic-grounding hardening + a verification step before answering.
-3. Short planning/decomposition for multi-part questions (bounded).
-4. Eval harness (question → expected-result pairs; execution-comparison grading).
+1. **Agentic `ask` loop** — self-correcting, tool-using. ✅ Built.
+2. **Semantic layer** (research-settled architecture: structured YAML core → DuckDB hybrid
+   term index → agent + metric compiler → OKF export). Sub-steps, one at a time:
+   1. **Model schema + mechanical enrichment** — dimensions / measures / synonyms per entity,
+      deterministically from the profiles (no AI). ✅ Built.
+   2. Metric compiler + `query_metric` agent tool (pragmatic guarded joins) — the agent queries
+      defined metrics, not raw tables.
+   3. Hybrid term-resolution index (`fts` BM25 + cosine + RRF, all in DuckDB; embeddings via
+      local Transformers.js, BYOK API as an upgrade) — NL terms → entity/column/metric.
+   4. Any-doc-in glossary ingestion (loaders → schema-grounded LLM extraction → reviewable diff).
+   5. OKF (Google Open Knowledge Format, MD+frontmatter) export for agent-ecosystem interop.
+3. Verification step before answering + eval harness (question → expected-result pairs).
+4. Short planning/decomposition for multi-part questions (bounded).
 5. **MCP server** — expose the read-only DuckDB tools to Claude Code / Cursor.
 6. **Rename to Grain** (package / bin / `.querypad` dir / domain / README) — *gated on formal
    trademark + domain clearance* (the name "datapad" was rejected: it collides with an active,

@@ -7,6 +7,8 @@ import type {
   ToolResultBlock,
   ToolUseBlock,
 } from "../ai/complete";
+import type { Relationship, SemanticModel } from "../../types/discovery";
+import { compileMetric, type MetricRequest } from "../discovery/compile-metric";
 import type { QueryRunner } from "../discovery/relationships";
 import { isReadOnlyQuery } from "../discovery/sql-safety";
 import { quoteIdent } from "../duckdb/sql-utils";
@@ -57,6 +59,9 @@ export interface RunAgentQueryOptions {
   /** Grounding context (schema + relationships + entities) from buildAskContext. */
   context: string;
   tables: TableInfo[];
+  /** Semantic model + relationships back the deterministic `query_metric` tool. */
+  model: SemanticModel;
+  relationships: Relationship[];
   runner: QueryRunner;
   complete: AgentComplete;
   /** Max tool-using turns before a forced final answer (default 8). */
@@ -89,6 +94,36 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         limit: { type: "integer", description: "Number of rows (1-50, default 5)." },
       },
       required: ["table"],
+    },
+  },
+  {
+    name: "query_metric",
+    description:
+      "Compute a defined metric (see the entity 'measures' in context), optionally grouped by dimensions and filtered. Prefer this over run_sql when a metric exists — it emits correct, join-guarded SQL.",
+    input_schema: {
+      type: "object",
+      properties: {
+        metric: { type: "string", description: "A measure name, e.g. sum_amount." },
+        dimensions: {
+          type: "array",
+          items: { type: "string" },
+          description: "Dimension names to group by.",
+        },
+        filters: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              column: { type: "string" },
+              op: { type: "string", enum: ["=", "!=", "<", "<=", ">", ">="] },
+              value: {},
+            },
+            required: ["column", "op", "value"],
+          },
+          description: "Filters applied as a WHERE clause.",
+        },
+      },
+      required: ["metric"],
     },
   },
   {
@@ -145,7 +180,7 @@ function toolUsesFrom(content: ContentBlock[]): ToolUseBlock[] {
  * finding. Engine-agnostic — the caller injects a `QueryRunner` (Node or Wasm).
  */
 export async function runAgentQuery(options: RunAgentQueryOptions): Promise<AgentQueryResult> {
-  const { question, context, tables, runner, complete } = options;
+  const { question, context, tables, model, relationships, runner, complete } = options;
   const maxSteps = options.maxSteps ?? 8;
   const system = `${AGENT_SYSTEM_PROMPT}\n\n${context}`;
 
@@ -175,6 +210,21 @@ export async function runAgentQuery(options: RunAgentQueryOptions): Promise<Agen
         const raw = typeof input.limit === "number" ? input.limit : 5;
         const limit = Math.max(1, Math.min(50, Math.trunc(raw)));
         const rows = await runner(`SELECT * FROM ${quoteIdent(name)} LIMIT ${limit}`);
+        return rowsToJson(rows);
+      }
+      case "query_metric": {
+        const request: MetricRequest = {
+          metric: String(input.metric ?? ""),
+          dimensions: Array.isArray(input.dimensions) ? input.dimensions.map(String) : undefined,
+          filters: Array.isArray(input.filters)
+            ? (input.filters as MetricRequest["filters"])
+            : undefined,
+        };
+        const compiled = compileMetric(model, relationships, request);
+        if (!compiled.ok) return compiled.error;
+        sqlHistory.push(compiled.sql);
+        const rows = await runner(compiled.sql);
+        lastResult = { columns: columnsOf(rows), rows };
         return rowsToJson(rows);
       }
       case "run_sql": {

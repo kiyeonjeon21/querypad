@@ -217,6 +217,25 @@ test("agent loop self-corrects a failing query, then converges on the answer", a
   assert.ok(out.includes("Insight:"));
 });
 
+test("agent computes a defined metric via query_metric (guarded join, real DuckDB)", async () => {
+  const result = await runAsk({
+    question: "total amount by plan",
+    folder: "fixtures/data",
+    ai: agentAi([
+      toolUse("m1", "query_metric", { metric: "sum_amount", dimensions: ["plan"] }),
+      textReply("Paid-plan users account for all payment volume."),
+    ]),
+    log: () => {},
+  });
+
+  assert.equal(result.insight, "Paid-plan users account for all payment volume.");
+  // The compiler emitted and ran a guarded SUM join, captured in the SQL trail.
+  assert.ok(result.agent?.sqlHistory.some((s) => /SUM\("payments"\."amount"\)/.test(s)));
+  assert.ok(result.result && result.result.rows.length >= 1);
+  assert.ok(result.result.columns.includes("plan"));
+  assert.ok(result.result.columns.includes("sum_amount"));
+});
+
 test("agent loop refuses non-read-only SQL and never executes it", async () => {
   const result = await runAsk({
     question: "delete everything",

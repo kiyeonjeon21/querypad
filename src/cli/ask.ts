@@ -162,6 +162,8 @@ export async function runAsk(options: RunAskOptions): Promise<AskResult> {
         question: options.question,
         context,
         tables,
+        model: semanticModel,
+        relationships,
         runner: db.runner,
         complete: ai.agentComplete,
         maxSteps: options.maxSteps,

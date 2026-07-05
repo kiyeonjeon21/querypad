@@ -176,6 +176,20 @@ Caveats (0)
   None.
 ```
 
+## CLI: enrich with a glossary
+
+```bash
+querypad enrich ./data glossary.md data-dictionary.xlsx --apply
+```
+
+Drop in your existing business-glossary documents in whatever shape they come —
+Markdown, text, CSV, JSON, or Excel — and `enrich` normalizes them, asks the model to
+extract terms **grounded on your real schema** (each term mapped to a real table/column,
+unmappable ones dropped), and merges the resulting descriptions and synonyms into the
+semantic model. It writes `.querypad/glossary.json` as reviewable proposals; `--apply`
+folds them into `semantic-model.yaml`. Those synonyms and descriptions then feed
+`resolve_terms`, so the analyst understands your team's vocabulary.
+
 ## Web app: interactive analysis
 
 The browser app at [querypad.io](https://querypad.io) is the same OSS app running

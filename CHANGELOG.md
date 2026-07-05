@@ -35,6 +35,10 @@ milestones and public product updates.
   (e.g. "customers" → User, "revenue" → sum_amount) to entities/columns/metrics. Lexical by
   default; run `inspect --embed` to precompute a local-model embedding cache
   (Transformers.js, all-MiniLM-L6-v2) and `ask` fuses lexical + vector via RRF
+- new `querypad enrich <folder> <doc…>` command: ingest heterogeneous business-glossary docs
+  (.md/.txt/.csv/.json/.xlsx) → schema-grounded LLM extraction (terms mapped to **real**
+  columns) → descriptions/synonyms merged into the semantic model. Writes `.querypad/glossary.json`
+  proposals; `--apply` folds them into `semantic-model.yaml`
 - New `querypad explain <folder>` command: justifies each inferred relationship from its
   signals (value overlap, name match, type, cardinality) and lists caveats to verify
 - Generated SQL is read-only-gated (only SELECT/WITH/EXPLAIN/… execute) and code-fence stripped

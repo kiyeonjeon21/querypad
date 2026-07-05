@@ -161,7 +161,7 @@ governed semantic model is reliable where naked text-to-SQL is not, and almost e
 competitor is cloud/warehouse-native. Build one step at a time:
 
 1. **Agentic `ask` loop** — self-correcting, tool-using. ✅ Built.
-2. **Semantic layer** (research-settled architecture: structured YAML core → DuckDB hybrid
+2. **Semantic layer** — ✅ Built (all five sub-steps). (Research-settled architecture: structured YAML core → DuckDB hybrid
    term index → agent + metric compiler → OKF export). Sub-steps, one at a time:
    1. **Model schema + mechanical enrichment** — dimensions / measures / synonyms per entity,
       deterministically from the profiles (no AI). ✅ Built.
@@ -173,7 +173,8 @@ competitor is cloud/warehouse-native. Build one step at a time:
    4. Any-doc-in glossary ingestion (`querypad enrich`): loaders (.md/.txt/.csv/.json/.xlsx) →
       schema-grounded LLM extraction (terms → real columns) → reviewable proposals, `--apply`
       folds descriptions/synonyms into the model. ✅ Built.
-   5. OKF (Google Open Knowledge Format, MD+frontmatter) export for agent-ecosystem interop.
+   5. OKF (Google Open Knowledge Format, MD+frontmatter) export for agent-ecosystem interop
+      (`querypad export-okf` → `.querypad/okf/`). ✅ Built.
 3. Verification step before answering + eval harness (question → expected-result pairs).
 4. Short planning/decomposition for multi-part questions (bounded).
 5. **MCP server** — expose the read-only DuckDB tools to Claude Code / Cursor.

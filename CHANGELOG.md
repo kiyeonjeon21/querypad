@@ -39,6 +39,10 @@ milestones and public product updates.
   (.md/.txt/.csv/.json/.xlsx) → schema-grounded LLM extraction (terms mapped to **real**
   columns) → descriptions/synonyms merged into the semantic model. Writes `.querypad/glossary.json`
   proposals; `--apply` folds them into `semantic-model.yaml`
+- new `querypad export-okf <folder>` command: export the semantic model as an **Open Knowledge
+  Format** (OKF v0.1) bundle — Markdown+frontmatter, one file per entity + `index.md`, interlinked —
+  under `.querypad/okf/`, so any OKF/agent-ecosystem tool can consume Grain's model. `inspect`/`enrich`
+  now also persist `semantic-model.json`
 - New `querypad explain <folder>` command: justifies each inferred relationship from its
   signals (value overlap, name match, type, cardinality) and lists caveats to verify
 - Generated SQL is read-only-gated (only SELECT/WITH/EXPLAIN/… execute) and code-fence stripped

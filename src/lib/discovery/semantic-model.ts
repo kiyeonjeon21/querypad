@@ -204,6 +204,7 @@ function renderDimension(dim: SemanticDimension): string {
   const parts = [`name: ${flowScalar(dim.name)}`, `column: ${flowScalar(dim.column)}`, `kind: ${dim.kind}`];
   if (dim.grain) parts.push(`grain: ${dim.grain}`);
   if (dim.values) parts.push(`values: ${flowList(dim.values)}`);
+  if (dim.description) parts.push(`description: ${flowScalar(dim.description)}`);
   return `      - {${parts.join(", ")}}`;
 }
 

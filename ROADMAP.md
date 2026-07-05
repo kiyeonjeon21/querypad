@@ -170,7 +170,9 @@ competitor is cloud/warehouse-native. Build one step at a time:
    3. Hybrid term-resolution index — NL terms → entity/column/metric via a `resolve_terms`
       tool: lexical token overlap always on, fused (RRF) with vector cosine over a local
       Transformers.js embedding cache (`inspect --embed`), BYOK API as an upgrade. ✅ Built.
-   4. Any-doc-in glossary ingestion (loaders → schema-grounded LLM extraction → reviewable diff).
+   4. Any-doc-in glossary ingestion (`querypad enrich`): loaders (.md/.txt/.csv/.json/.xlsx) →
+      schema-grounded LLM extraction (terms → real columns) → reviewable proposals, `--apply`
+      folds descriptions/synonyms into the model. ✅ Built.
    5. OKF (Google Open Knowledge Format, MD+frontmatter) export for agent-ecosystem interop.
 3. Verification step before answering + eval harness (question → expected-result pairs).
 4. Short planning/decomposition for multi-part questions (bounded).

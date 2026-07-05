@@ -31,6 +31,10 @@ milestones and public product updates.
   metric + dimensions + filters into correct, **join-guarded** SQL (many-to-one joins only;
   a grouping that would fan out the measure is refused) — the agent queries the semantic
   layer instead of hand-writing every aggregation
+- **hybrid term resolution**: a new `resolve_terms` agent tool maps a user's words/synonyms
+  (e.g. "customers" → User, "revenue" → sum_amount) to entities/columns/metrics. Lexical by
+  default; run `inspect --embed` to precompute a local-model embedding cache
+  (Transformers.js, all-MiniLM-L6-v2) and `ask` fuses lexical + vector via RRF
 - New `querypad explain <folder>` command: justifies each inferred relationship from its
   signals (value overlap, name match, type, cardinality) and lists caveats to verify
 - Generated SQL is read-only-gated (only SELECT/WITH/EXPLAIN/… execute) and code-fence stripped

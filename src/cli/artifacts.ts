@@ -1,10 +1,12 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { renderSemanticYaml } from "../lib/discovery/semantic-model";
+import type { TermEntry } from "../lib/discovery/term-catalog";
 import type { TableProfile } from "../types";
 import type { DiscoveryReport, Relationship } from "../types/discovery";
 
 const ARTIFACT_DIR = ".querypad";
+const TERM_EMBEDDINGS_FILE = "term-embeddings.json";
 
 export interface CachedArtifacts {
   relationships: Relationship[] | null;
@@ -30,6 +32,28 @@ export async function readArtifacts(folder: string): Promise<CachedArtifacts> {
     relationships: relDoc?.relationships ?? null,
     profiles: schemaDoc?.tables ?? null,
   };
+}
+
+/** A precomputed term index: the catalog with a vector per entry. */
+export interface TermEmbeddings {
+  model: string;
+  dim: number;
+  entries: Array<TermEntry & { vector: number[] }>;
+}
+
+/** Write the term-embeddings cache used for hybrid term resolution. */
+export async function writeTermEmbeddings(folder: string, data: TermEmbeddings): Promise<string> {
+  const dir = path.resolve(folder, ARTIFACT_DIR);
+  await mkdir(dir, { recursive: true });
+  const filePath = path.join(dir, TERM_EMBEDDINGS_FILE);
+  await writeFile(filePath, JSON.stringify(data));
+  return filePath;
+}
+
+/** Read the term-embeddings cache (null when absent). */
+export async function readTermEmbeddings(folder: string): Promise<TermEmbeddings | null> {
+  const dir = path.resolve(folder, ARTIFACT_DIR);
+  return readJson<TermEmbeddings>(path.join(dir, TERM_EMBEDDINGS_FILE));
 }
 
 export interface WrittenArtifacts {

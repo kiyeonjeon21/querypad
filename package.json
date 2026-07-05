@@ -51,6 +51,7 @@
     "@dagrejs/dagre": "^2.0.4",
     "@duckdb/duckdb-wasm": "^1.33.1-dev20.0",
     "@duckdb/node-api": "^1.5.3-r.3",
+    "@huggingface/transformers": "^3.8.1",
     "@monaco-editor/react": "^4.7.0",
     "@tanstack/react-virtual": "^3.13.23",
     "@vercel/analytics": "^2.0.1",

@@ -1,17 +1,28 @@
 import path from "node:path";
 import { discoverRelationships } from "../lib/discovery/relationships";
 import { buildSemanticModel } from "../lib/discovery/semantic-model";
+import { buildTermCatalog } from "../lib/discovery/term-catalog";
 import { createNodeDb } from "../lib/duckdb-node/connection";
 import { loadFolder } from "../lib/duckdb-node/load";
 import { profileTable } from "../lib/duckdb-node/profile";
+import { EMBED_DIM, EMBED_MODEL, type Embedder } from "../lib/embed/embedder";
 import type { DiscoveryReport } from "../types/discovery";
-import { writeArtifacts } from "./artifacts";
+import { writeArtifacts, writeTermEmbeddings } from "./artifacts";
+
+export interface InspectOptions {
+  /** When set, precompute a term-embeddings cache for hybrid resolution. */
+  embedder?: Embedder;
+}
 
 /**
  * `querypad inspect <folder>`: load every supported file in the folder, profile it,
  * infer relationships, and write `.querypad/` artifacts. Returns the report.
  */
-export async function runInspect(folder: string, now: number): Promise<DiscoveryReport> {
+export async function runInspect(
+  folder: string,
+  now: number,
+  options: InspectOptions = {}
+): Promise<DiscoveryReport> {
   const resolved = path.resolve(folder);
   const db = await createNodeDb();
   try {
@@ -49,6 +60,18 @@ export async function runInspect(folder: string, now: number): Promise<Discovery
 
     const report: DiscoveryReport = { generatedAt: now, profiles, relationships, semanticModel };
     const artifacts = await writeArtifacts(resolved, report, skipped);
+
+    if (options.embedder) {
+      console.log("Embedding terms ...");
+      const catalog = buildTermCatalog(semanticModel);
+      const vectors = await options.embedder(catalog.map((entry) => entry.text));
+      await writeTermEmbeddings(resolved, {
+        model: EMBED_MODEL,
+        dim: EMBED_DIM,
+        entries: catalog.map((entry, i) => ({ ...entry, vector: vectors[i] })),
+      });
+      console.log(`Embedded ${catalog.length} term(s) → term-embeddings.json`);
+    }
 
     console.log("");
     console.log(`Tables:        ${profiles.length}`);

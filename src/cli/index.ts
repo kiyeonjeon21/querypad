@@ -2,6 +2,7 @@
 import { runAsk } from "./ask";
 import { runEnrich } from "./enrich";
 import { runExplain } from "./explain";
+import { runExportOkf } from "./export-okf";
 import { runInspect } from "./inspect";
 
 const HELP = `querypad — local-first dataset understanding
@@ -20,6 +21,8 @@ Usage:
                                    to the semantic model. Add --apply to write semantic-model.yaml.
   querypad explain [folder]        Justify each inferred relationship from its signals,
                                    with caveats to verify (reads .querypad/; run inspect first).
+  querypad export-okf [folder]     Export the semantic model as an Open Knowledge Format
+                                   (Markdown+frontmatter) bundle under .querypad/okf/.
   querypad help                    Show this help
 
 Options for ask:
@@ -116,6 +119,10 @@ async function main(argv: string[]): Promise<number> {
     case "explain": {
       const { positionals } = parseArgs(rest);
       return runExplain(positionals[0] ?? ".");
+    }
+    case "export-okf": {
+      const { positionals } = parseArgs(rest);
+      return runExportOkf(positionals[0] ?? ".");
     }
     default:
       console.error(`Unknown command: ${command}\n`);

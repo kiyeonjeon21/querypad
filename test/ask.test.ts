@@ -236,6 +236,21 @@ test("agent computes a defined metric via query_metric (guarded join, real DuckD
   assert.ok(result.result.columns.includes("sum_amount"));
 });
 
+test("agent resolves a term to schema via resolve_terms (lexical fallback)", async () => {
+  const result = await runAsk({
+    question: "what about plan",
+    folder: "fixtures/data",
+    ai: agentAi([
+      toolUse("r1", "resolve_terms", { query: "plan" }),
+      textReply("Resolved."),
+    ]),
+    log: () => {},
+  });
+  const step = result.agent?.steps.find((s) => s.tool === "resolve_terms");
+  assert.ok(step, "resolve_terms step present");
+  assert.match(step!.output, /plan.*users\.plan/);
+});
+
 test("agent loop refuses non-read-only SQL and never executes it", async () => {
   const result = await runAsk({
     question: "delete everything",

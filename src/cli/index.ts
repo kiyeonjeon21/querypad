@@ -8,6 +8,8 @@ const HELP = `querypad — local-first dataset understanding
 Usage:
   querypad inspect [folder]        Profile a folder of data files and infer relationships
                                    (writes .querypad/ artifacts). Defaults to the current directory.
+                                   --embed  precompute a term-embeddings cache (local model)
+                                            so ask can resolve synonyms/terms semantically
   querypad ask "<question>" [folder]
                                    Answer a natural-language question: an agentic loop explores
                                    the schema, runs read-only SQL (self-correcting on errors),
@@ -63,9 +65,12 @@ async function main(argv: string[]): Promise<number> {
       console.log(HELP);
       return 0;
     case "inspect": {
-      const { positionals } = parseArgs(rest);
+      const { positionals, flags } = parseArgs(rest);
       const folder = positionals[0] ?? ".";
-      await runInspect(folder, Date.now());
+      const embedder = flags.embed === true
+        ? (await import("../lib/embed/transformers-embedder")).createTransformersEmbedder()
+        : undefined;
+      await runInspect(folder, Date.now(), { embedder });
       return 0;
     }
     case "ask": {

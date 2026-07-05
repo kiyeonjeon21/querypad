@@ -10,12 +10,14 @@ import {
 import { discoverRelationships } from "../lib/discovery/relationships";
 import { buildSemanticModel } from "../lib/discovery/semantic-model";
 import { isReadOnlyQuery, stripSqlFences } from "../lib/discovery/sql-safety";
+import { resolveTerms } from "../lib/discovery/term-search";
+import { createTransformersEmbedder } from "../lib/embed/transformers-embedder";
 import { createNodeDb, type QueryResultRows } from "../lib/duckdb-node/connection";
 import { loadFolder } from "../lib/duckdb-node/load";
 import { profileTable } from "../lib/duckdb-node/profile";
 import type { Relationship } from "../types/discovery";
 import { resolveAiCredentials } from "./ai-env";
-import { readArtifacts } from "./artifacts";
+import { readArtifacts, readTermEmbeddings } from "./artifacts";
 import { renderTable } from "./render";
 
 const ANALYST_SYSTEM_PROMPT = `You are a data analyst. Given a question, the SQL that was run, and a sample of the result rows, state the answer as a concise 1-3 sentence finding. No preamble, do not restate the SQL, do not apologize.`;
@@ -158,12 +160,27 @@ export async function runAsk(options: RunAskOptions): Promise<AskResult> {
 
     // Agent mode: a tool-using, self-correcting loop over the read-only DuckDB.
     if (ai.agentComplete) {
+      // Hybrid term resolution only when an embeddings cache exists (inspect --embed);
+      // otherwise the loop falls back to lexical-only resolution built from the model.
+      const cachedEmbeddings = await readTermEmbeddings(options.folder);
+      let resolveTermsFn;
+      if (cachedEmbeddings) {
+        const embedder = createTransformersEmbedder();
+        const entries = cachedEmbeddings.entries;
+        const entryVectors = entries.map((entry) => entry.vector);
+        resolveTermsFn = async (query: string) => {
+          const [queryVector] = await embedder([query]);
+          return resolveTerms(entries, query, { queryVector, entryVectors });
+        };
+      }
+
       const agent = await runAgentQuery({
         question: options.question,
         context,
         tables,
         model: semanticModel,
         relationships,
+        resolveTerms: resolveTermsFn,
         runner: db.runner,
         complete: ai.agentComplete,
         maxSteps: options.maxSteps,

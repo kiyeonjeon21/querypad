@@ -11,6 +11,8 @@ import type { Relationship, SemanticModel } from "../../types/discovery";
 import { compileMetric, type MetricRequest } from "../discovery/compile-metric";
 import type { QueryRunner } from "../discovery/relationships";
 import { isReadOnlyQuery } from "../discovery/sql-safety";
+import { buildTermCatalog, formatTarget } from "../discovery/term-catalog";
+import { resolveTerms, type ResolvedTerm } from "../discovery/term-search";
 import { quoteIdent } from "../duckdb/sql-utils";
 
 /** Preamble prepended to the grounding context to steer the agent. */
@@ -62,6 +64,8 @@ export interface RunAgentQueryOptions {
   /** Semantic model + relationships back the deterministic `query_metric` tool. */
   model: SemanticModel;
   relationships: Relationship[];
+  /** Optional hybrid term resolver (vector+lexical); defaults to lexical-only from the model. */
+  resolveTerms?: (query: string) => Promise<ResolvedTerm[]>;
   runner: QueryRunner;
   complete: AgentComplete;
   /** Max tool-using turns before a forced final answer (default 8). */
@@ -94,6 +98,16 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         limit: { type: "integer", description: "Number of rows (1-50, default 5)." },
       },
       required: ["table"],
+    },
+  },
+  {
+    name: "resolve_terms",
+    description:
+      "Map a natural-language word or phrase (e.g. a synonym like 'customers' or 'revenue') to the matching entities, columns, or metrics. Use it when the user's wording doesn't obviously match a table/column.",
+    input_schema: {
+      type: "object",
+      properties: { query: { type: "string", description: "A word or phrase to resolve." } },
+      required: ["query"],
     },
   },
   {
@@ -182,6 +196,8 @@ function toolUsesFrom(content: ContentBlock[]): ToolUseBlock[] {
 export async function runAgentQuery(options: RunAgentQueryOptions): Promise<AgentQueryResult> {
   const { question, context, tables, model, relationships, runner, complete } = options;
   const maxSteps = options.maxSteps ?? 8;
+  const lexicalCatalog = buildTermCatalog(model);
+  const resolve = options.resolveTerms ?? (async (query: string) => resolveTerms(lexicalCatalog, query));
   const system = `${AGENT_SYSTEM_PROMPT}\n\n${context}`;
 
   const knownTables = new Map(tables.map((table) => [table.name, table]));
@@ -211,6 +227,13 @@ export async function runAgentQuery(options: RunAgentQueryOptions): Promise<Agen
         const limit = Math.max(1, Math.min(50, Math.trunc(raw)));
         const rows = await runner(`SELECT * FROM ${quoteIdent(name)} LIMIT ${limit}`);
         return rowsToJson(rows);
+      }
+      case "resolve_terms": {
+        const results = await resolve(String(input.query ?? ""));
+        if (results.length === 0) return "No matching terms.";
+        return results
+          .map((r) => `${r.entry.term} (${r.entry.kind}) → ${formatTarget(r.entry.target)}`)
+          .join("\n");
       }
       case "query_metric": {
         const request: MetricRequest = {

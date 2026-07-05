@@ -44,6 +44,8 @@ export interface SemanticDimension {
   grain?: "day" | "month" | "year";
   /** Categorical dimensions only, when the value set is small. */
   values?: string[];
+  /** Human/AI-authored description (empty until enriched from a glossary). */
+  description?: string;
 }
 
 /** A named aggregation over an entity. `count` omits `column`. */

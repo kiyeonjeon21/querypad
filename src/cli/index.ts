@@ -1,5 +1,6 @@
 #!/usr/bin/env -S npx tsx
 import { runAsk } from "./ask";
+import { runEnrich } from "./enrich";
 import { runExplain } from "./explain";
 import { runInspect } from "./inspect";
 
@@ -14,6 +15,9 @@ Usage:
                                    Answer a natural-language question: an agentic loop explores
                                    the schema, runs read-only SQL (self-correcting on errors),
                                    and explains the result — grounded in the inferred relationships.
+  querypad enrich <folder> <doc…>  Ingest business-glossary docs (.md/.txt/.csv/.json/.xlsx)
+                                   and map terms → real columns, adding descriptions/synonyms
+                                   to the semantic model. Add --apply to write semantic-model.yaml.
   querypad explain [folder]        Justify each inferred relationship from its signals,
                                    with caveats to verify (reads .querypad/; run inspect first).
   querypad help                    Show this help
@@ -89,6 +93,23 @@ async function main(argv: string[]): Promise<number> {
         showSql: flags["show-sql"] === true,
         maxSteps: steps && Number.isFinite(steps) ? steps : undefined,
         verbose: flags.verbose === true,
+      });
+      return 0;
+    }
+    case "enrich": {
+      const { positionals, flags } = parseArgs(rest);
+      const folder = positionals[0];
+      const glossaryPaths = positionals.slice(1);
+      if (!folder || glossaryPaths.length === 0) {
+        console.error("Usage: querypad enrich <folder> <doc…> [--apply]\n");
+        console.error(HELP);
+        return 1;
+      }
+      await runEnrich({
+        folder,
+        glossaryPaths,
+        apply: flags.apply === true,
+        provider: typeof flags.provider === "string" ? flags.provider : undefined,
       });
       return 0;
     }

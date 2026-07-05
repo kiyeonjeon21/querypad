@@ -1,12 +1,15 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import type { AppliedChange, GlossaryEntry } from "../lib/discovery/glossary";
 import { renderSemanticYaml } from "../lib/discovery/semantic-model";
 import type { TermEntry } from "../lib/discovery/term-catalog";
 import type { TableProfile } from "../types";
-import type { DiscoveryReport, Relationship } from "../types/discovery";
+import type { DiscoveryReport, Relationship, SemanticModel } from "../types/discovery";
 
 const ARTIFACT_DIR = ".querypad";
 const TERM_EMBEDDINGS_FILE = "term-embeddings.json";
+const GLOSSARY_FILE = "glossary.json";
+const SEMANTIC_MODEL_FILE = "semantic-model.yaml";
 
 export interface CachedArtifacts {
   relationships: Relationship[] | null;
@@ -54,6 +57,27 @@ export async function writeTermEmbeddings(folder: string, data: TermEmbeddings):
 export async function readTermEmbeddings(folder: string): Promise<TermEmbeddings | null> {
   const dir = path.resolve(folder, ARTIFACT_DIR);
   return readJson<TermEmbeddings>(path.join(dir, TERM_EMBEDDINGS_FILE));
+}
+
+/** Write the extracted glossary + applied-change summary. */
+export async function writeGlossary(
+  folder: string,
+  data: { generatedAt: number; entries: GlossaryEntry[]; applied: AppliedChange[] }
+): Promise<string> {
+  const dir = path.resolve(folder, ARTIFACT_DIR);
+  await mkdir(dir, { recursive: true });
+  const filePath = path.join(dir, GLOSSARY_FILE);
+  await writeFile(filePath, JSON.stringify(data, null, 2));
+  return filePath;
+}
+
+/** Rewrite `semantic-model.yaml` from a (possibly enriched) model. */
+export async function writeSemanticModel(folder: string, model: SemanticModel): Promise<string> {
+  const dir = path.resolve(folder, ARTIFACT_DIR);
+  await mkdir(dir, { recursive: true });
+  const filePath = path.join(dir, SEMANTIC_MODEL_FILE);
+  await writeFile(filePath, renderSemanticYaml(model));
+  return filePath;
 }
 
 export interface WrittenArtifacts {

@@ -190,6 +190,18 @@ semantic model. It writes `.querypad/glossary.json` as reviewable proposals; `--
 folds them into `semantic-model.yaml`. Those synonyms and descriptions then feed
 `resolve_terms`, so the analyst understands your team's vocabulary.
 
+## CLI: export to Open Knowledge Format
+
+```bash
+querypad export-okf ./data
+```
+
+Exports the semantic model as an [Open Knowledge Format](https://okf.md) (OKF v0.1) bundle
+under `.querypad/okf/` — Markdown with YAML frontmatter, one file per entity plus an
+`index.md`, interlinked with Markdown links. OKF is the emerging vendor-neutral format for
+giving AI agents curated context about datasets, so any OKF-aware tool (or a coding agent
+reading the folder) can consume Grain's model directly.
+
 ## Web app: interactive analysis
 
 The browser app at [querypad.io](https://querypad.io) is the same OSS app running

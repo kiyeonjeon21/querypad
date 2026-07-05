@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { AppliedChange, GlossaryEntry } from "../lib/discovery/glossary";
+import type { OkfFile } from "../lib/discovery/okf-export";
 import { renderSemanticYaml } from "../lib/discovery/semantic-model";
 import type { TermEntry } from "../lib/discovery/term-catalog";
 import type { TableProfile } from "../types";
@@ -10,6 +11,8 @@ const ARTIFACT_DIR = ".querypad";
 const TERM_EMBEDDINGS_FILE = "term-embeddings.json";
 const GLOSSARY_FILE = "glossary.json";
 const SEMANTIC_MODEL_FILE = "semantic-model.yaml";
+const SEMANTIC_MODEL_JSON = "semantic-model.json";
+const OKF_DIR = "okf";
 
 export interface CachedArtifacts {
   relationships: Relationship[] | null;
@@ -71,13 +74,28 @@ export async function writeGlossary(
   return filePath;
 }
 
-/** Rewrite `semantic-model.yaml` from a (possibly enriched) model. */
+/** Rewrite `semantic-model.yaml` + `.json` from a (possibly enriched) model. */
 export async function writeSemanticModel(folder: string, model: SemanticModel): Promise<string> {
   const dir = path.resolve(folder, ARTIFACT_DIR);
   await mkdir(dir, { recursive: true });
   const filePath = path.join(dir, SEMANTIC_MODEL_FILE);
   await writeFile(filePath, renderSemanticYaml(model));
+  await writeFile(path.join(dir, SEMANTIC_MODEL_JSON), JSON.stringify(model, null, 2));
   return filePath;
+}
+
+/** Read the persisted semantic model (null when absent). */
+export async function readSemanticModel(folder: string): Promise<SemanticModel | null> {
+  const dir = path.resolve(folder, ARTIFACT_DIR);
+  return readJson<SemanticModel>(path.join(dir, SEMANTIC_MODEL_JSON));
+}
+
+/** Write an OKF bundle (Markdown+frontmatter files) under `.querypad/okf/`. */
+export async function writeOkfBundle(folder: string, files: OkfFile[]): Promise<string> {
+  const dir = path.resolve(folder, ARTIFACT_DIR, OKF_DIR);
+  await mkdir(dir, { recursive: true });
+  for (const file of files) await writeFile(path.join(dir, file.path), file.content);
+  return dir;
 }
 
 export interface WrittenArtifacts {
@@ -115,6 +133,10 @@ export async function writeArtifacts(
     )
   );
   await writeFile(semanticModelPath, renderSemanticYaml(report.semanticModel));
+  await writeFile(
+    path.join(dir, SEMANTIC_MODEL_JSON),
+    JSON.stringify(report.semanticModel, null, 2)
+  );
   await writeFile(summaryPath, buildSummary(report, skipped));
 
   return { dir, schemaPath, relationshipsPath, semanticModelPath, summaryPath };

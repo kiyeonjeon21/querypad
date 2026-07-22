@@ -19,7 +19,7 @@ import { profileTable } from "../../engine/duckdb/profile";
 import type { Relationship } from "../../core/types/discovery";
 import { resolveAiCredentials } from "./ai-env";
 import { readArtifacts, readTermEmbeddings, readVerdicts } from "./artifacts";
-import { renderTable } from "./render";
+import { renderTable, terminalRenderOptions } from "./render";
 
 const ANALYST_SYSTEM_PROMPT = `You are a data analyst. Given a question, the SQL that was run, and a sample of the result rows, state the answer as a concise 1-3 sentence finding. No preamble, do not restate the SQL, do not apologize.`;
 
@@ -195,7 +195,7 @@ export async function runAsk(options: RunAskOptions): Promise<AskResult> {
       log(sql || "(no SQL executed)");
       if (agent.lastResult) {
         log("");
-        log(renderTable(agent.lastResult));
+        log(renderTable(agent.lastResult, terminalRenderOptions()));
       }
       log("");
       log(`Insight: ${agent.answer.trim()}`);
@@ -221,7 +221,7 @@ export async function runAsk(options: RunAskOptions): Promise<AskResult> {
 
     const result = await db.query(sql);
     log("");
-    log(renderTable(result));
+    log(renderTable(result, terminalRenderOptions()));
 
     const sample = renderTable(result, 20);
     const insight = await ai.generateInsight({ question: options.question, sql, sample });

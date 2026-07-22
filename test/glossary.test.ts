@@ -3,11 +3,10 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import * as XLSX from "xlsx";
-import { runEnrich, type GlossaryAi } from "../src/cli/enrich";
-import { loadDoc } from "../src/cli/loaders";
-import { mergeGlossary, parseGlossary } from "../src/lib/discovery/glossary";
-import type { SemanticModel } from "../src/types/discovery";
+import { runEnrich, type GlossaryAi } from "../src/adapters/cli/enrich";
+import { loadDoc } from "../src/adapters/cli/loaders";
+import { mergeGlossary, parseGlossary } from "../src/core/discovery/glossary";
+import type { SemanticModel } from "../src/core/types/discovery";
 
 async function tempFile(name: string, content: string): Promise<string> {
   const dir = await mkdtemp(path.join(tmpdir(), "grain-glossary-"));
@@ -34,24 +33,17 @@ const MODEL: SemanticModel = {
 
 // ---- Loaders ------------------------------------------------------------------
 
-test("loadDoc reads text formats and normalizes xlsx to csv", async () => {
+test("loadDoc reads text formats", async () => {
   const md = await tempFile("g.md", "# Glossary\nMRR = monthly recurring revenue");
   assert.match(await loadDoc(md), /monthly recurring revenue/);
 
   const csv = await tempFile("g.csv", "term,definition\nplan,subscription tier");
   assert.match(await loadDoc(csv), /subscription tier/);
+});
 
-  const sheet = XLSX.utils.aoa_to_sheet([
-    ["term", "definition"],
-    ["plan", "subscription tier"],
-  ]);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, sheet, "Terms");
-  const dir = await mkdtemp(path.join(tmpdir(), "grain-xlsx-"));
-  const xlsxPath = path.join(dir, "g.xlsx");
-  XLSX.writeFile(wb, xlsxPath);
-  const text = await loadDoc(xlsxPath);
-  assert.match(text, /subscription tier/);
+test("loadDoc rejects spreadsheets with a CSV hint", async () => {
+  const xlsx = await tempFile("g.xlsx", "not-a-real-workbook");
+  await assert.rejects(loadDoc(xlsx), /Export the sheet as CSV/);
 });
 
 test("loadDoc rejects unsupported types", async () => {
@@ -136,7 +128,7 @@ test("runEnrich builds the model, applies extracted terms, and writes glossary.j
   // glossary.json was written (readTermEmbeddings shares the dir; just check the file exists).
   const { readFile } = await import("node:fs/promises");
   const glossary = JSON.parse(
-    await readFile("fixtures/data/.querypad/glossary.json", "utf8")
+    await readFile("fixtures/data/.datactx/glossary.json", "utf8")
   ) as { entries: unknown[] };
   assert.ok(Array.isArray(glossary.entries) && glossary.entries.length === 2);
 });

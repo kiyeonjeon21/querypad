@@ -4,10 +4,10 @@ import {
   buildSemanticModel,
   entityName,
   renderSemanticYaml,
-} from "../src/lib/discovery/semantic-model";
-import { buildAskContext } from "../src/lib/agent/ask-context";
-import type { ColumnProfile, TableProfile } from "../src/types";
-import type { Relationship } from "../src/types/discovery";
+} from "../src/core/discovery/semantic-model";
+import { buildAskContext } from "../src/core/agent/ask-context";
+import type { ColumnProfile, TableProfile } from "../src/core/types";
+import type { Relationship } from "../src/core/types/discovery";
 
 function rel(
   fromTable: string,

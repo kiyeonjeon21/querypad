@@ -3,10 +3,10 @@ import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { writeSemanticModel } from "../src/cli/artifacts";
-import { runExportOkf } from "../src/cli/export-okf";
-import { buildOkfBundle } from "../src/lib/discovery/okf-export";
-import type { SemanticModel } from "../src/types/discovery";
+import { writeSemanticModel } from "../src/adapters/cli/artifacts";
+import { runExportOkf } from "../src/adapters/cli/export-okf";
+import { buildOkfBundle } from "../src/core/discovery/okf-export";
+import type { SemanticModel } from "../src/core/types/discovery";
 
 const MODEL: SemanticModel = {
   generatedAt: 1700000000000,
@@ -65,9 +65,9 @@ test("runExportOkf writes the bundle from the persisted model", async () => {
   const code = await runExportOkf(dir);
   assert.equal(code, 0);
 
-  const index = await readFile(path.join(dir, ".querypad", "okf", "index.md"), "utf8");
+  const index = await readFile(path.join(dir, ".datactx", "okf", "index.md"), "utf8");
   assert.match(index, /## Entities/);
-  const users = await readFile(path.join(dir, ".querypad", "okf", "users.md"), "utf8");
+  const users = await readFile(path.join(dir, ".datactx", "okf", "users.md"), "utf8");
   assert.match(users, /# User/);
 });
 

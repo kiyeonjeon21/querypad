@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { compileMetric } from "../src/lib/discovery/compile-metric";
-import type { Relationship, SemanticModel } from "../src/types/discovery";
+import { compileMetric } from "../src/core/discovery/compile-metric";
+import type { Relationship, SemanticModel } from "../src/core/types/discovery";
 
 const MODEL: SemanticModel = {
   generatedAt: 1,

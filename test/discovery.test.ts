@@ -9,11 +9,11 @@ import {
   singularize,
   splitTokens,
   typeMatchScore,
-} from "../src/lib/discovery/signals";
-import { discoverRelationships, relationshipKey } from "../src/lib/discovery/relationships";
-import { createNodeDb } from "../src/lib/duckdb-node/connection";
-import { loadFolder } from "../src/lib/duckdb-node/load";
-import { profileTable } from "../src/lib/duckdb-node/profile";
+} from "../src/core/discovery/signals";
+import { discoverRelationships, relationshipKey } from "../src/core/discovery/relationships";
+import { createNodeDb } from "../src/engine/duckdb/connection";
+import { loadFolder } from "../src/engine/duckdb/load";
+import { profileTable } from "../src/engine/duckdb/profile";
 
 // ---- Pure signal unit tests ---------------------------------------------------
 

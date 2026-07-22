@@ -3,9 +3,9 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { buildExplanation } from "../src/lib/discovery/explain";
-import { runExplain } from "../src/cli/explain";
-import type { Relationship, RelationshipSignals } from "../src/types/discovery";
+import { buildExplanation } from "../src/core/discovery/explain";
+import { runExplain } from "../src/adapters/cli/explain";
+import type { Relationship, RelationshipSignals } from "../src/core/types/discovery";
 
 function rel(
   fromTable: string,

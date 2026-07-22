@@ -1,13 +1,21 @@
 # QueryPad Roadmap — Cursor for Data
 
-QueryPad is pivoting from "AI-powered SQL editor" to **Cursor for Data**: a
-local-first AI workspace that understands folders of CSV/Parquet files, discovers
-relationships, builds semantic models, and answers business questions using DuckDB.
+QueryPad is **Cursor for Data**: a local-first AI tool that understands folders
+of CSV/Parquet files, discovers relationships, builds semantic models, and
+answers business questions using DuckDB.
 
 The execution layer is solved — DuckDB does it well. The unsolved problem is
 **dataset understanding**: which tables exist, what each field means, how datasets
 connect, which join is correct. That is the bottleneck this roadmap attacks, and
-the reason we build the understanding engine **CLI-first** before investing in UI.
+the reason the understanding engine is built **CLI-first**.
+
+**Surface decision (2026-07): terminal-first.** The browser app was retired
+(tag `web-final`, ~6k LOC removed); repeating it in a TUI would compete with
+polished terminal SQL IDEs (Harlequin) on ground that is not our moat. The
+surfaces are the CLI today, an MCP server next, and possibly a dedicated
+terminal host later (cmux demonstrates the shape: a native host embedding
+libghostty that runs agents — our CLI would be a first-class citizen inside
+it, not a reimplementation).
 
 > Cursor understands code → generates code → edits code → runs code.
 > QueryPad understands datasets → infers relationships → generates SQL → executes analysis → explains findings.
@@ -27,15 +35,16 @@ Layer 4  AI Analyst          →  question → semantic model → SQL → execut
 |-------|-------------|--------|
 | 1 — Dataset Discovery | Folder scan + per-column profiles (`profileTable`, `loadFolder`) | ✅ Built |
 | 2 — Relationship Discovery | Confidence-scored FK inference (`discoverRelationships`, `querypad inspect`) | ✅ Built |
-| 3 — Semantic Model | Entity rollup → `.querypad/semantic-model.yaml` (`buildSemanticModel`) | ✅ Built |
+| 3 — Semantic Model | Entity rollup → `.datactx/semantic-model.yaml` (`buildSemanticModel`) | ✅ Built |
 | 4 — AI Analyst | `querypad ask`: NL → agentic tool-using loop (explore → SQL → self-correct → insight) | ✅ Built |
 | `querypad explain` | Justify each relationship from stored `RelationshipSignals` + caveats | ✅ Built |
-| UI — AI Verification | Sidebar Relationships panel: accept/reject/edit inferred joins | ✅ Built |
+| AI Verification | `.datactx/verdicts.json`: reject/override inferred joins; honored by inspect/ask/explain | ✅ Built (CLI) |
 | MCP server | Expose `inspect`/`ask`/`explain` as typed agent tools | 🚧 Planned (step 5 below) |
 
 ## Built today
 
-Two CLI commands ship: `querypad inspect` (Layers 1–2) and `querypad ask` (Layer 4).
+Six commands ship: `inspect` (Layers 1–2), `ask` (Layer 4), `explain`, `enrich`,
+`export-okf`, and `help`.
 
 ```bash
 querypad inspect ./data
@@ -46,7 +55,7 @@ Tables:        3
 Relationships: 2
   payments.user_id ↳ users.id  (100%, many-to-one)
   events.user_id   ↳ users.id  (100%, many-to-one)
-Wrote artifacts to ./data/.querypad
+Wrote artifacts to ./data/.datactx
 ```
 
 ```bash
@@ -61,14 +70,18 @@ FROM payments p JOIN users u ON p.user_id = u.id GROUP BY u.plan
 Insight: All payments come from paid-plan users.
 ```
 
-Architecture (engine-agnostic core, two DuckDB bindings):
+Architecture (core / engine / adapters):
 
 ```text
-src/lib/discovery/     signals.ts · relationships.ts · semantic-model.ts · explain.ts · sql-safety.ts
-src/lib/ai/            complete.ts (shared streaming) · generate-sql.ts · providers.ts
-src/lib/duckdb-node/   connection.ts · load.ts · profile.ts   (native @duckdb/node-api)
-src/lib/duckdb/        sql-utils.ts (shared) · profile.ts      (browser DuckDB-Wasm)
-src/cli/               index.ts (dispatch) · inspect.ts · ask.ts · explain.ts · artifacts.ts
+src/core/       pure logic, zero npm deps: discovery (signals · relationships ·
+                semantic-model · explain · verdicts · compile-metric · glossary ·
+                okf-export · term-catalog · term-search · sql-safety) · agent loop ·
+                sql utils · formatters · types
+src/engine/     QueryRunner implementations (duckdb: native @duckdb/node-api)
+src/ai/         complete.ts (shared streaming) · generate-sql.ts · providers.ts
+src/embed/      embedding interface + optional Transformers.js backend
+src/adapters/   cli (index · inspect · ask · explain · enrich · export-okf ·
+                artifacts · render) — mcp lands beside it
 ```
 
 Relationship discovery: profile each table → find primary-key candidates (unique,
@@ -78,12 +91,13 @@ similarity, type match, cardinality shape) into a 0–100% confidence → keep e
 foreign column's single strongest target (competition disambiguation) so
 overlapping id ranges don't yield false positives.
 
-Artifacts written to `.querypad/`:
+Artifacts written to `.datactx/`:
 
 ```text
 schema.json          tables, columns, types, per-column profiles
 relationships.json   inferred joins with confidence + per-signal breakdown
 semantic-model.yaml  named business entities (belongs_to / has_many / has_one)
+verdicts.json        user curation: reject/override inferred joins (optional)
 inspect-summary.md   human- and agent-readable overview
 ```
 
@@ -92,7 +106,7 @@ inspect-summary.md   human- and agent-readable overview
 Rolls inferred relationships into named business entities, stored as the source of truth.
 
 ```yaml
-# .querypad/semantic-model.yaml
+# .datactx/semantic-model.yaml
 entities:
   - name: User
     table: users
@@ -138,13 +152,13 @@ querypad ask "show 7-day retention for paid users" ./data
 Question → grounded in relationships → agent loop { list/describe/sample → run_sql → observe → self-correct } → insight
 ```
 
-- An **agentic observe-act loop** (`src/lib/agent/loop.ts`, `runAgentQuery`): the model calls
+- An **agentic observe-act loop** (`src/core/agent/loop.ts`, `runAgentQuery`): the model calls
   read-only tools (`list_tables`, `describe_table`, `sample_table`, `run_sql`, `resolve_terms`
-  — hybrid term→schema resolution, `src/lib/discovery/term-search.ts` — and `query_metric` —
-  a deterministic metric compiler, `src/lib/discovery/compile-metric.ts`),
+  — hybrid term→schema resolution, `src/core/discovery/term-search.ts` — and `query_metric` —
+  a deterministic metric compiler, `src/core/discovery/compile-metric.ts`),
   reads their output — including DB errors — and rewrites failing SQL until it converges
-  (bounded by `--steps`, default 8). Engine-agnostic via the shared `QueryRunner`, so it runs
-  on the Node native binding today and DuckDB-Wasm later.
+  (bounded by `--steps`, default 8). Engine-agnostic via the shared `QueryRunner`, so other
+  engines can bind later.
 - Grounded in the inferred relationships and the semantic model's entities (`buildAskContext`),
   the market-standard anti-hallucination surface — the agent joins on the right keys and
   reasons in domain terms.
@@ -153,7 +167,7 @@ Question → grounded in relationships → agent loop { list/describe/sample →
   back to a single-shot pipeline. `--verbose` shows each tool step; `--show-sql` previews a
   single query without executing.
 
-## Next — deepening the agent (product renaming to **Grain**)
+## Next — deepening the agent
 
 Direction set from late-2025/2026 market research (competitive landscape, agentic
 architecture, naming). The moat is **semantic-first + local-first**: an agent grounded in a
@@ -170,63 +184,81 @@ competitor is cloud/warehouse-native. Build one step at a time:
    3. Hybrid term-resolution index — NL terms → entity/column/metric via a `resolve_terms`
       tool: lexical token overlap always on, fused (RRF) with vector cosine over a local
       Transformers.js embedding cache (`inspect --embed`), BYOK API as an upgrade. ✅ Built.
-   4. Any-doc-in glossary ingestion (`querypad enrich`): loaders (.md/.txt/.csv/.json/.xlsx) →
+   4. Any-doc-in glossary ingestion (`querypad enrich`): loaders (.md/.txt/.csv/.json;
+      spreadsheets dropped — xlsx@0.18.5 carries unfixable CVEs, users export CSV) →
       schema-grounded LLM extraction (terms → real columns) → reviewable proposals, `--apply`
       folds descriptions/synonyms into the model. ✅ Built.
    5. OKF (Google Open Knowledge Format, MD+frontmatter) export for agent-ecosystem interop
-      (`querypad export-okf` → `.querypad/okf/`). ✅ Built.
-3. Verification step before answering + eval harness (question → expected-result pairs).
-4. Short planning/decomposition for multi-part questions (bounded).
+      (`querypad export-okf` → `.datactx/okf/`). ✅ Built.
+3. **External databases via DuckDB ATTACH** — postgres/mysql/sqlite extensions make the
+   engine's `QueryRunner` (one line: sql → rows) work over real warehouses, no JDBC/DBeaver.
+   Surface-independent; raises the value of every layer above it.
+4. Verification step before answering + eval harness (question → expected-result pairs).
 5. **MCP server** — expose the read-only DuckDB tools to Claude Code / Cursor.
-6. **Rename to Grain** (package / bin / `.querypad` dir / domain / README) — *gated on formal
-   trademark + domain clearance* (the name "datapad" was rejected: it collides with an active,
-   funded competitor in the same category).
+   With the web app retired this is the primary interactive surface strategy: the coding
+   agent is the UI.
+6. Short planning/decomposition for multi-part questions (bounded).
+7. **Terminal host experiment** — integrate with cmux (scriptable CLI + socket API +
+   sidebar) before considering a dedicated libghostty host; only build one if the
+   experiment surfaces needs cmux cannot meet.
+8. **Rename** (package / bin / domain / README) — *gated on formal trademark + domain
+   clearance* (the name "datapad" was rejected: it collides with an active, funded
+   competitor in the same category; "grain" has an npm squatter + a language collision).
+   The artifact dir is already brand-independent (`.datactx/`), and npm publish waits
+   for the name.
 
 ## `querypad explain` (built)
 
-`querypad explain <folder>` reads `.querypad/relationships.json` and renders the stored
+`querypad explain <folder>` reads `.datactx/relationships.json` and renders the stored
 per-signal breakdown (`buildExplanation`) as a justification for each inferred relationship:
 value overlap, name match, type match, and cardinality. It also surfaces caveats —
 low-confidence edges, high-overlap/weak-name matches that may be coincidental, and tables
 with no inferred relationships. Pure consumer of artifacts (no DuckDB / AI); run `inspect` first.
 
-## UI — AI Verification (built)
+## AI Verification — verdicts (built)
 
-The browser app has a **Relationships panel** in the sidebar — its purpose is
-**AI verification**, not dashboard building. It runs the same discovery engine in the
-browser (DuckDB-Wasm via `createBrowserQueryRunner`) and lets the user validate the
-AI's assumptions:
+The AI proposes; the user decides. `.datactx/verdicts.json` holds the curation —
+verdicts keyed by `relationshipKey` (reject a wrong join) plus overrides (edit or
+add one by hand):
 
-```text
-Detected relationship
-  payments.user_id ↳ users.id     Confidence 100%
-  [Accept]  [Reject]  [Edit]   (Why? → per-signal justification)
+```json
+{
+  "verdicts": { "events.user_id->users.id": "rejected" },
+  "overrides": []
+}
 ```
 
-`RelationshipsPanel.tsx` reuses the shared `src/lib/discovery` core (`discoverRelationships`,
-`buildExplanation`) — the same edges the CLI emits — so no logic is duplicated. Verdicts and
-edits are keyed by `relationshipKey` and persisted to IndexedDB. The existing browser app
-(Monaco, charts, pipelines, sharing) remains the interactive-analysis surface; the
-verification view is additive.
+`applyVerdicts` (`src/core/discovery/verdicts.ts`, pure + idempotent) curates the
+graph everywhere it is consumed: `inspect` (before the semantic model is built),
+`ask` (before grounding the agent), and `explain`. Re-running `inspect` preserves
+the file, so curation survives re-inference. The file is hand- and agent-editable;
+an interactive `verify` command (walk each edge, y/n/e) can build on it later.
+This replaces the retired web app's Relationships panel (IndexedDB verdicts).
 
 ## Claude Code integration
 
 `querypad inspect` makes the dataset legible to coding agents. Instead of guessing
-with pandas, Claude Code reads `.querypad/schema.json` + `relationships.json` and
+with pandas, Claude Code reads `.datactx/schema.json` + `relationships.json` and
 reasons about the data directly:
 
 ```text
 Claude Code  +  QueryPad  +  DuckDB
 ```
 
-A future MCP server can expose the same engine (`inspect`, `ask`, `describe`) as
-typed tools for agent workflows — a natural follow-on once Layers 3–4 land.
+Layers 3–4 have landed, so the MCP server (step 5) is the natural next surface:
+the same engine exposed as typed read-only tools, making the coding agent the
+interactive UI instead of a bespoke one.
 
 ## Principles
 
 - **Use DuckDB.** Do not build a database or a query engine.
 - **Understanding before UI.** Relationship inference and semantic modeling are the
-  bottleneck; a dashboard built before solving them is just another BI tool.
+  bottleneck; a dashboard built before solving them is just another BI tool. The
+  corollary, learned the expensive way: a surface that does not advance the
+  understanding engine is a liability, not an asset.
+- **Thin, replaceable surfaces.** The engine (`src/core`) has zero npm dependencies
+  and never touches a connection or an HTTP client. Surfaces live in `src/adapters`
+  and are cheap to add or delete.
 - **Local-first.** Computation and storage stay on the user's machine; AI is BYOK.
 - **Agent-native.** Artifacts are structured, typed, and token-efficient so agents
   can consume them directly.

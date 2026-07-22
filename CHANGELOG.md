@@ -1,17 +1,43 @@
 # Changelog
 
-QueryPad is a web app, not an npm package. Version numbers mark GitHub release
-milestones and public product updates.
+QueryPad is a local-first CLI. Version numbers mark GitHub release milestones
+and public product updates.
 
-## Unreleased
+## v0.7 — Terminal-First
 
-### Web: Relationship Verification
+### BREAKING: web app removed
 
-- New Relationships panel in the sidebar: runs the same discovery engine in the browser
-  (DuckDB-Wasm) and lists inferred joins with confidence and a per-signal "why"
-- Accept / Reject / Edit each relationship to curate the AI's assumptions; verdicts and
-  edits persist across refresh (IndexedDB)
-- Reuses the engine-agnostic `src/lib/discovery` core (no logic duplicated between CLI and web)
+- QueryPad is now terminal-first: the browser app (Next.js, DuckDB-Wasm, Monaco,
+  charts, pipelines, sharing, collaboration, plugins — ~6k LOC) is retired. The last
+  web-app state remains readable at the `web-final` git tag
+- The web Relationships panel is replaced by `.datactx/verdicts.json` (below)
+- Artifact directory renamed: `.querypad/` → `.datactx/` (brand-independent contract;
+  re-run `inspect` after upgrading)
+- `enrich` no longer accepts spreadsheets (`.xlsx`/`.xls`/`.ods`): the abandoned
+  `xlsx@0.18.5` package carries two unfixable high CVEs exactly where untrusted files
+  are parsed. Export the sheet as CSV instead
+- Source reshaped into `src/core` (pure logic, zero npm deps) / `src/engine`
+  (DuckDB binding) / `src/ai` / `src/embed` / `src/adapters` (cli)
+- Dependencies: 20 → 1 (`@duckdb/node-api`); `@huggingface/transformers` is now an
+  optionalDependency, needed only for `inspect --embed`
+
+### Relationship verdicts
+
+- New `.datactx/verdicts.json`: reject inferred joins or override/add them by hand;
+  `inspect`, `ask`, and `explain` all honor it and re-runs preserve the curation
+
+### Terminal rendering
+
+- Result tables are display-width aware (CJK/Hangul align correctly), clamp to the
+  terminal width, right-align numbers, and dim NULLs (NO_COLOR honored)
+- Piped stdout switches to TSV with uncapped rows for downstream tools
+
+### Packaging
+
+- `tsup` bundles the CLI into a single executable (`dist/querypad.mjs`); `npm link`
+  installs a working `querypad` binary. Publishing to npm is deferred until the
+  product rename is settled
+- New spawn-based CLI e2e suite in `npm run test:cli` (replaces Playwright)
 
 ### CLI: Dataset Understanding
 
@@ -23,7 +49,7 @@ milestones and public product updates.
   inferred relationships (`--verbose` shows each tool step, `--steps` caps the turns)
 - `ask` now suggests 2-3 follow-up questions after each answer (dataset-aware next steps)
 - `inspect` now builds a semantic model (named business entities with belongs_to/has_many)
-  and writes `.querypad/semantic-model.yaml`; `ask` feeds those entities as context too
+  and writes `.datactx/semantic-model.yaml`; `ask` feeds those entities as context too
 - the semantic model now carries mechanically-derived **dimensions**, **measures**, and
   **synonyms** per entity (deterministic, no AI) — the agent is grounded in what you group
   by and the metrics that exist, the top text-to-SQL accuracy lever
@@ -36,18 +62,18 @@ milestones and public product updates.
   default; run `inspect --embed` to precompute a local-model embedding cache
   (Transformers.js, all-MiniLM-L6-v2) and `ask` fuses lexical + vector via RRF
 - new `querypad enrich <folder> <doc…>` command: ingest heterogeneous business-glossary docs
-  (.md/.txt/.csv/.json/.xlsx) → schema-grounded LLM extraction (terms mapped to **real**
-  columns) → descriptions/synonyms merged into the semantic model. Writes `.querypad/glossary.json`
+  (.md/.txt/.csv/.json) → schema-grounded LLM extraction (terms mapped to **real**
+  columns) → descriptions/synonyms merged into the semantic model. Writes `.datactx/glossary.json`
   proposals; `--apply` folds them into `semantic-model.yaml`
 - new `querypad export-okf <folder>` command: export the semantic model as an **Open Knowledge
   Format** (OKF v0.1) bundle — Markdown+frontmatter, one file per entity + `index.md`, interlinked —
-  under `.querypad/okf/`, so any OKF/agent-ecosystem tool can consume Grain's model. `inspect`/`enrich`
+  under `.datactx/okf/`, so any OKF/agent-ecosystem tool can consume the model. `inspect`/`enrich`
   now also persist `semantic-model.json`
 - New `querypad explain <folder>` command: justifies each inferred relationship from its
   signals (value overlap, name match, type, cardinality) and lists caveats to verify
 - Generated SQL is read-only-gated (only SELECT/WITH/EXPLAIN/… execute) and code-fence stripped
 - CLI AI keys come from `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`; provider via `--provider`
-- Writes `.querypad/` artifacts (`schema.json`, `relationships.json`, `inspect-summary.md`)
+- Writes `.datactx/` artifacts (`schema.json`, `relationships.json`, `inspect-summary.md`)
   for AI agents such as Claude Code to reason about the dataset
 - Engine-agnostic discovery core shared between the browser app and the Node CLI
 - Runs on a native Node DuckDB engine (`@duckdb/node-api`), separate from the browser Wasm engine

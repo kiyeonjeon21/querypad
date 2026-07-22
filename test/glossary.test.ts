@@ -3,7 +3,6 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import * as XLSX from "xlsx";
 import { runEnrich, type GlossaryAi } from "../src/cli/enrich";
 import { loadDoc } from "../src/cli/loaders";
 import { mergeGlossary, parseGlossary } from "../src/lib/discovery/glossary";
@@ -34,24 +33,17 @@ const MODEL: SemanticModel = {
 
 // ---- Loaders ------------------------------------------------------------------
 
-test("loadDoc reads text formats and normalizes xlsx to csv", async () => {
+test("loadDoc reads text formats", async () => {
   const md = await tempFile("g.md", "# Glossary\nMRR = monthly recurring revenue");
   assert.match(await loadDoc(md), /monthly recurring revenue/);
 
   const csv = await tempFile("g.csv", "term,definition\nplan,subscription tier");
   assert.match(await loadDoc(csv), /subscription tier/);
+});
 
-  const sheet = XLSX.utils.aoa_to_sheet([
-    ["term", "definition"],
-    ["plan", "subscription tier"],
-  ]);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, sheet, "Terms");
-  const dir = await mkdtemp(path.join(tmpdir(), "grain-xlsx-"));
-  const xlsxPath = path.join(dir, "g.xlsx");
-  XLSX.writeFile(wb, xlsxPath);
-  const text = await loadDoc(xlsxPath);
-  assert.match(text, /subscription tier/);
+test("loadDoc rejects spreadsheets with a CSV hint", async () => {
+  const xlsx = await tempFile("g.xlsx", "not-a-real-workbook");
+  await assert.rejects(loadDoc(xlsx), /Export the sheet as CSV/);
 });
 
 test("loadDoc rejects unsupported types", async () => {

@@ -6,7 +6,7 @@ import type {
   TableProfile,
 } from "../../types";
 import type { QueryRunner } from "../discovery/relationships";
-import { classifyType, quoteIdent } from "../duckdb/sql-utils";
+import { classifyType, quoteIdent } from "../../core/sql/sql-utils";
 
 function toNumber(value: unknown): number | null {
   if (typeof value === "bigint") return Number(value);

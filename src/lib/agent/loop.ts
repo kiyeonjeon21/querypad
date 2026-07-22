@@ -13,7 +13,7 @@ import type { QueryRunner } from "../discovery/relationships";
 import { isReadOnlyQuery } from "../discovery/sql-safety";
 import { buildTermCatalog, formatTarget } from "../discovery/term-catalog";
 import { resolveTerms, type ResolvedTerm } from "../discovery/term-search";
-import { quoteIdent } from "../duckdb/sql-utils";
+import { quoteIdent } from "../../core/sql/sql-utils";
 
 /** Preamble prepended to the grounding context to steer the agent. */
 export const AGENT_SYSTEM_PROMPT = `You are a data analyst agent working over a local, read-only DuckDB database.

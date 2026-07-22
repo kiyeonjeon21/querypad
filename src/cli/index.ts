@@ -16,7 +16,7 @@ Usage:
                                    Answer a natural-language question: an agentic loop explores
                                    the schema, runs read-only SQL (self-correcting on errors),
                                    and explains the result — grounded in the inferred relationships.
-  querypad enrich <folder> <doc…>  Ingest business-glossary docs (.md/.txt/.csv/.json/.xlsx)
+  querypad enrich <folder> <doc…>  Ingest business-glossary docs (.md/.txt/.csv/.json)
                                    and map terms → real columns, adding descriptions/synonyms
                                    to the semantic model. Add --apply to write semantic-model.yaml.
   querypad explain [folder]        Justify each inferred relationship from its signals,

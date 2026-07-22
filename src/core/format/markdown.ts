@@ -1,5 +1,5 @@
 import type { QueryResult } from "@/types";
-import { formatValue } from "@/lib/utils";
+import { formatValue } from "../utils";
 
 function escapeMd(val: string): string {
   return val.replace(/\|/g, "\\|").replace(/\n/g, " ");

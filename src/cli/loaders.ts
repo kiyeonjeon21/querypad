@@ -1,6 +1,5 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import * as XLSX from "xlsx";
 
 /** A glossary document normalized to text for LLM extraction. */
 export interface LoadedDoc {
@@ -20,21 +19,21 @@ const TEXT_EXTENSIONS = new Set([
   "",
 ]);
 
-/** Load one glossary document, normalizing spreadsheets to CSV text. */
+/** Load one glossary document as text. */
 export async function loadDoc(filePath: string): Promise<string> {
   const ext = path.extname(filePath).toLowerCase();
   if (ext === ".xlsx" || ext === ".xls" || ext === ".ods") {
-    const workbook = XLSX.readFile(filePath);
-    return workbook.SheetNames.map(
-      (name) => `# ${name}\n${XLSX.utils.sheet_to_csv(workbook.Sheets[name])}`
-    ).join("\n\n");
+    throw new Error(
+      `Spreadsheet input is not supported (${filePath}). ` +
+        "Export the sheet as CSV and pass the .csv file instead."
+    );
   }
   if (TEXT_EXTENSIONS.has(ext)) {
     return readFile(filePath, "utf8");
   }
   throw new Error(
     `Unsupported glossary file type "${ext || "(none)"}" (${filePath}). ` +
-      "Supported: .md, .txt, .csv, .tsv, .json, .xlsx."
+      "Supported: .md, .txt, .csv, .tsv, .json."
   );
 }
 

@@ -1,5 +1,5 @@
 import type { QueryResult } from "@/types";
-import { formatValue } from "@/lib/utils";
+import { formatValue } from "../utils";
 
 function escapeCsvField(val: string): string {
   if (val.includes(",") || val.includes('"') || val.includes("\n") || val.includes("\r")) {

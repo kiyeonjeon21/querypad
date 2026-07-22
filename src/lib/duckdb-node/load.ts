@@ -2,8 +2,8 @@ import { readdir } from "node:fs/promises";
 import path from "node:path";
 import type { ColumnInfo, TableInfo } from "../../types";
 import type { QueryRunner } from "../discovery/relationships";
-import { fileExtension, sanitizeTableName } from "../utils";
-import { quoteIdent } from "../duckdb/sql-utils";
+import { fileExtension, sanitizeTableName } from "../../core/utils";
+import { quoteIdent } from "../../core/sql/sql-utils";
 
 /** File types DuckDB can read directly from disk in Node. */
 const SUPPORTED_EXTENSIONS = new Set(["parquet", "csv", "tsv", "json", "jsonl", "ndjson"]);

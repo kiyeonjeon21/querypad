@@ -2,7 +2,7 @@
   "name": "querypad",
   "version": "0.6.0",
   "private": true,
-  "description": "Cursor for Data — a local-first AI workspace that understands datasets (discovers relationships, builds semantic models) and analyzes them with DuckDB.",
+  "description": "Cursor for Data — a local-first AI CLI that understands datasets (discovers relationships, builds semantic models) and analyzes them with DuckDB.",
   "author": "QueryPad Contributors",
   "license": "MIT",
   "repository": {
@@ -31,56 +31,25 @@
     "local-first"
   ],
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
     "querypad": "tsx src/cli/index.ts",
-    "lint": "eslint",
+    "lint": "eslint src test scripts",
     "typecheck": "tsc --noEmit",
     "check:version": "node scripts/check-version.mjs",
-    "check": "npm run check:version && npm run lint && npm run typecheck && npm run build",
+    "check": "npm run check:version && npm run lint && npm run typecheck",
     "version": "npm run check:version",
-    "partykit:dev": "partykit dev",
-    "partykit:deploy": "partykit deploy",
-    "postinstall": "node scripts/copy-duckdb-wasm.mjs",
-    "test": "playwright test",
-    "test:ui": "playwright test --ui",
     "test:cli": "node --import tsx --test test/*.test.ts"
   },
   "dependencies": {
-    "@dagrejs/dagre": "^2.0.4",
-    "@duckdb/duckdb-wasm": "^1.33.1-dev20.0",
-    "@duckdb/node-api": "^1.5.3-r.3",
-    "@huggingface/transformers": "^3.8.1",
-    "@monaco-editor/react": "^4.7.0",
-    "@tanstack/react-virtual": "^3.13.23",
-    "@vercel/analytics": "^2.0.1",
-    "@xyflow/react": "^12.10.1",
-    "idb-keyval": "^6.2.2",
-    "next": "16.2.0",
-    "pako": "^2.1.0",
-    "partykit": "^0.0.115",
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
-    "recharts": "^3.8.0",
-    "xlsx": "^0.18.5",
-    "y-monaco": "^0.1.6",
-    "y-partykit": "^0.0.33",
-    "yjs": "^13.6.30",
-    "zustand": "^5.0.12"
+    "@duckdb/node-api": "^1.5.3-r.3"
+  },
+  "optionalDependencies": {
+    "@huggingface/transformers": "^3.8.1"
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.2",
-    "@tailwindcss/postcss": "^4",
-    "@types/dagre": "^0.7.54",
     "@types/node": "^20",
-    "@types/pako": "^2.0.4",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.0",
-    "tailwindcss": "^4",
     "tsx": "^4.22.4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "typescript-eslint": "^8"
   }
 }

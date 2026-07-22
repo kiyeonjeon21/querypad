@@ -1,4 +1,4 @@
-import type { QueryResult } from "@/types";
+import type { QueryResult } from "../types";
 
 export type ChartType = "bar" | "line" | "scatter" | "pie";
 

@@ -1,4 +1,4 @@
-import type { ProfileColumnKind } from "@/types";
+import type { ProfileColumnKind } from "../types";
 
 /** Quote a SQL identifier (table or column name), escaping embedded double quotes. */
 export function quoteIdent(identifier: string): string {

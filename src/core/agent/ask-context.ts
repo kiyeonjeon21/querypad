@@ -1,6 +1,6 @@
-import type { TableInfo } from "../../types";
-import type { Relationship, SemanticModel } from "../../types/discovery";
-import { buildSchemaContext } from "../ai/schema-context";
+import type { TableInfo } from "../types";
+import type { Relationship, SemanticModel } from "../types/discovery";
+import { buildSchemaContext } from "../../ai/schema-context";
 
 export interface AskContextInput {
   tables: TableInfo[];

@@ -1,21 +1,21 @@
-import { complete, completeWithTools } from "../lib/ai/complete";
-import { SQL_SYSTEM_PROMPT, buildSqlInput } from "../lib/ai/generate-sql";
-import { buildAskContext } from "../lib/agent/ask-context";
+import { complete, completeWithTools } from "../../ai/complete";
+import { SQL_SYSTEM_PROMPT, buildSqlInput } from "../../ai/generate-sql";
+import { buildAskContext } from "../../core/agent/ask-context";
 import {
   runAgentQuery,
   type AgentComplete,
   type AgentQueryResult,
   type AgentStep,
-} from "../lib/agent/loop";
-import { discoverRelationships } from "../lib/discovery/relationships";
-import { buildSemanticModel } from "../lib/discovery/semantic-model";
-import { isReadOnlyQuery, stripSqlFences } from "../lib/discovery/sql-safety";
-import { resolveTerms } from "../lib/discovery/term-search";
-import { createTransformersEmbedder } from "../lib/embed/transformers-embedder";
-import { createNodeDb, type QueryResultRows } from "../lib/duckdb-node/connection";
-import { loadFolder } from "../lib/duckdb-node/load";
-import { profileTable } from "../lib/duckdb-node/profile";
-import type { Relationship } from "../types/discovery";
+} from "../../core/agent/loop";
+import { discoverRelationships } from "../../core/discovery/relationships";
+import { buildSemanticModel } from "../../core/discovery/semantic-model";
+import { isReadOnlyQuery, stripSqlFences } from "../../core/discovery/sql-safety";
+import { resolveTerms } from "../../core/discovery/term-search";
+import { createTransformersEmbedder } from "../../embed/transformers-embedder";
+import { createNodeDb, type QueryResultRows } from "../../engine/duckdb/connection";
+import { loadFolder } from "../../engine/duckdb/load";
+import { profileTable } from "../../engine/duckdb/profile";
+import type { Relationship } from "../../core/types/discovery";
 import { resolveAiCredentials } from "./ai-env";
 import { readArtifacts, readTermEmbeddings } from "./artifacts";
 import { renderTable } from "./render";

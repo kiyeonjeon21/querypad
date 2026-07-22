@@ -1,6 +1,6 @@
-import type { ColumnProfile, TableProfile } from "../../types";
-import type { Relationship } from "../../types/discovery";
-import { quoteIdent } from "../../core/sql/sql-utils";
+import type { ColumnProfile, TableProfile } from "../types";
+import type { Relationship } from "../types/discovery";
+import { quoteIdent } from "../sql/sql-utils";
 import {
   NAME_SIMILARITY_FLOOR,
   OVERLAP_FLOOR,

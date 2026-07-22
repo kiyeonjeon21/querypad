@@ -1,4 +1,4 @@
-import type { SemanticModel } from "../../types/discovery";
+import type { SemanticModel } from "../types/discovery";
 
 /**
  * Export the semantic model as an Open Knowledge Format (OKF v0.1) bundle — a directory of

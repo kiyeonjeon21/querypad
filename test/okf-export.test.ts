@@ -3,10 +3,10 @@ import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { writeSemanticModel } from "../src/cli/artifacts";
-import { runExportOkf } from "../src/cli/export-okf";
-import { buildOkfBundle } from "../src/lib/discovery/okf-export";
-import type { SemanticModel } from "../src/types/discovery";
+import { writeSemanticModel } from "../src/adapters/cli/artifacts";
+import { runExportOkf } from "../src/adapters/cli/export-okf";
+import { buildOkfBundle } from "../src/core/discovery/okf-export";
+import type { SemanticModel } from "../src/core/types/discovery";
 
 const MODEL: SemanticModel = {
   generatedAt: 1700000000000,

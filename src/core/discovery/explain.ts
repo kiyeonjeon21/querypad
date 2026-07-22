@@ -1,4 +1,4 @@
-import type { Relationship } from "../../types/discovery";
+import type { Relationship } from "../types/discovery";
 
 /**
  * Turn a relationship's stored signals into a human-readable justification. Pure —

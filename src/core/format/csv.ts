@@ -1,4 +1,4 @@
-import type { QueryResult } from "@/types";
+import type { QueryResult } from "../types";
 import { formatValue } from "../utils";
 
 function escapeCsvField(val: string): string {

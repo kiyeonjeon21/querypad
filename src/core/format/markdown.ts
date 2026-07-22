@@ -1,4 +1,4 @@
-import type { QueryResult } from "@/types";
+import type { QueryResult } from "../types";
 import { formatValue } from "../utils";
 
 function escapeMd(val: string): string {

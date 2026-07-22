@@ -1,16 +1,16 @@
-import { complete } from "../lib/ai/complete";
+import { complete } from "../../ai/complete";
 import {
   mergeGlossary,
   parseGlossary,
   type AppliedChange,
   type GlossaryEntry,
-} from "../lib/discovery/glossary";
-import { discoverRelationships } from "../lib/discovery/relationships";
-import { buildSemanticModel } from "../lib/discovery/semantic-model";
-import { createNodeDb } from "../lib/duckdb-node/connection";
-import { loadFolder } from "../lib/duckdb-node/load";
-import { profileTable } from "../lib/duckdb-node/profile";
-import type { SemanticModel } from "../types/discovery";
+} from "../../core/discovery/glossary";
+import { discoverRelationships } from "../../core/discovery/relationships";
+import { buildSemanticModel } from "../../core/discovery/semantic-model";
+import { createNodeDb } from "../../engine/duckdb/connection";
+import { loadFolder } from "../../engine/duckdb/load";
+import { profileTable } from "../../engine/duckdb/profile";
+import type { SemanticModel } from "../../core/types/discovery";
 import { resolveAiCredentials } from "./ai-env";
 import { writeGlossary, writeSemanticModel } from "./artifacts";
 import { loadDocs, type LoadedDoc } from "./loaders";

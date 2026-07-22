@@ -1,4 +1,4 @@
-import type { QueryResult } from "@/types";
+import type { QueryResult } from "../types";
 
 export function exportJson(result: QueryResult): string {
   return JSON.stringify(

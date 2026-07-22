@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildTermCatalog, formatTarget } from "../src/lib/discovery/term-catalog";
-import { lexicalScore, resolveTerms } from "../src/lib/discovery/term-search";
-import type { SemanticModel } from "../src/types/discovery";
+import { buildTermCatalog, formatTarget } from "../src/core/discovery/term-catalog";
+import { lexicalScore, resolveTerms } from "../src/core/discovery/term-search";
+import type { SemanticModel } from "../src/core/types/discovery";
 
 const MODEL: SemanticModel = {
   generatedAt: 1,

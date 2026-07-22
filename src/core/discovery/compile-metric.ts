@@ -1,5 +1,5 @@
-import type { Relationship, SemanticMeasure, SemanticModel } from "../../types/discovery";
-import { quoteIdent as qi } from "../../core/sql/sql-utils";
+import type { Relationship, SemanticMeasure, SemanticModel } from "../types/discovery";
+import { quoteIdent as qi } from "../sql/sql-utils";
 import { isReadOnlyQuery } from "./sql-safety";
 
 /**

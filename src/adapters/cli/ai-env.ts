@@ -1,5 +1,5 @@
-import type { AiProvider } from "../lib/ai/providers";
-import { DEFAULT_AI_PROVIDER, isAiProvider } from "../lib/ai/providers";
+import type { AiProvider } from "../../ai/providers";
+import { DEFAULT_AI_PROVIDER, isAiProvider } from "../../ai/providers";
 
 export interface AiCredentials {
   provider: AiProvider;

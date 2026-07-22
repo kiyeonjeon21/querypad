@@ -11,7 +11,7 @@
   },
   "homepage": "https://querypad.io",
   "bin": {
-    "querypad": "src/cli/index.ts"
+    "querypad": "src/adapters/cli/index.ts"
   },
   "keywords": [
     "cursor-for-data",
@@ -31,7 +31,7 @@
     "local-first"
   ],
   "scripts": {
-    "querypad": "tsx src/cli/index.ts",
+    "querypad": "tsx src/adapters/cli/index.ts",
     "lint": "eslint src test scripts",
     "typecheck": "tsc --noEmit",
     "check:version": "node scripts/check-version.mjs",

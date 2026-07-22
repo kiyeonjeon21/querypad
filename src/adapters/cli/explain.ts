@@ -1,4 +1,4 @@
-import { buildExplanation } from "../lib/discovery/explain";
+import { buildExplanation } from "../../core/discovery/explain";
 import { readArtifacts } from "./artifacts";
 
 export interface RunExplainOptions {

@@ -1,4 +1,4 @@
-import type { QueryResultRows } from "../lib/duckdb-node/connection";
+import type { QueryResultRows } from "../../engine/duckdb/connection";
 
 const DEFAULT_ROW_CAP = 50;
 

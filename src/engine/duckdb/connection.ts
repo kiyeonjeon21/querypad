@@ -1,5 +1,5 @@
 import { DuckDBInstance, type DuckDBConnection } from "@duckdb/node-api";
-import type { QueryRunner } from "../discovery/relationships";
+import type { QueryRunner } from "../../core/discovery/relationships";
 
 export interface QueryResultRows {
   columns: string[];

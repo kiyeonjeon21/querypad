@@ -1,4 +1,4 @@
-import type { TableInfo } from "../../types";
+import type { TableInfo } from "../types";
 import type {
   ChatMessage,
   ContentBlock,
@@ -6,14 +6,14 @@ import type {
   ToolDefinition,
   ToolResultBlock,
   ToolUseBlock,
-} from "../ai/complete";
-import type { Relationship, SemanticModel } from "../../types/discovery";
+} from "../../ai/complete";
+import type { Relationship, SemanticModel } from "../types/discovery";
 import { compileMetric, type MetricRequest } from "../discovery/compile-metric";
 import type { QueryRunner } from "../discovery/relationships";
 import { isReadOnlyQuery } from "../discovery/sql-safety";
 import { buildTermCatalog, formatTarget } from "../discovery/term-catalog";
 import { resolveTerms, type ResolvedTerm } from "../discovery/term-search";
-import { quoteIdent } from "../../core/sql/sql-utils";
+import { quoteIdent } from "../sql/sql-utils";
 
 /** Preamble prepended to the grounding context to steer the agent. */
 export const AGENT_SYSTEM_PROMPT = `You are a data analyst agent working over a local, read-only DuckDB database.

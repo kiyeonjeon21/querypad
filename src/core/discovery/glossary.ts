@@ -1,4 +1,4 @@
-import type { SemanticModel } from "../../types/discovery";
+import type { SemanticModel } from "../types/discovery";
 import { stripSqlFences } from "./sql-safety";
 
 /**

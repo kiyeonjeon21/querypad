@@ -1,4 +1,4 @@
-import type { TableInfo } from "@/types";
+import type { TableInfo } from "../core/types";
 
 export function buildSchemaContext(tables: TableInfo[]): string {
   if (tables.length === 0) return "No tables loaded.";

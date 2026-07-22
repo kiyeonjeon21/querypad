@@ -1,11 +1,11 @@
-import type { ColumnProfile, TableProfile } from "../../types";
+import type { ColumnProfile, TableProfile } from "../types";
 import type {
   Relationship,
   SemanticDimension,
   SemanticEntity,
   SemanticMeasure,
   SemanticModel,
-} from "../../types/discovery";
+} from "../types/discovery";
 import { singularize, splitTokens } from "./signals";
 
 /**

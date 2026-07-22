@@ -1,4 +1,4 @@
-import { buildOkfBundle } from "../lib/discovery/okf-export";
+import { buildOkfBundle } from "../../core/discovery/okf-export";
 import { readSemanticModel, writeOkfBundle } from "./artifacts";
 
 /**

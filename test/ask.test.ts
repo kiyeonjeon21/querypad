@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isReadOnlyQuery, stripSqlFences } from "../src/lib/discovery/sql-safety";
-import { buildAskContext } from "../src/lib/agent/ask-context";
-import { parseFollowups, runAsk, type AskAi } from "../src/cli/ask";
-import type { AgentComplete } from "../src/lib/agent/loop";
-import type { ToolCompletion } from "../src/lib/ai/complete";
-import type { Relationship } from "../src/types/discovery";
+import { isReadOnlyQuery, stripSqlFences } from "../src/core/discovery/sql-safety";
+import { buildAskContext } from "../src/core/agent/ask-context";
+import { parseFollowups, runAsk, type AskAi } from "../src/adapters/cli/ask";
+import type { AgentComplete } from "../src/core/agent/loop";
+import type { ToolCompletion } from "../src/ai/complete";
+import type { Relationship } from "../src/core/types/discovery";
 
 const REL: Relationship = {
   from: { table: "payments", column: "user_id" },

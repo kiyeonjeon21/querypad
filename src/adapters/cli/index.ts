@@ -75,7 +75,7 @@ async function main(argv: string[]): Promise<number> {
       const { positionals, flags } = parseArgs(rest);
       const folder = positionals[0] ?? ".";
       const embedder = flags.embed === true
-        ? (await import("../lib/embed/transformers-embedder")).createTransformersEmbedder()
+        ? (await import("../../embed/transformers-embedder")).createTransformersEmbedder()
         : undefined;
       await runInspect(folder, Date.now(), { embedder });
       return 0;

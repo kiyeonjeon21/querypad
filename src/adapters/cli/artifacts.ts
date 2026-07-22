@@ -1,11 +1,11 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { AppliedChange, GlossaryEntry } from "../lib/discovery/glossary";
-import type { OkfFile } from "../lib/discovery/okf-export";
-import { renderSemanticYaml } from "../lib/discovery/semantic-model";
-import type { TermEntry } from "../lib/discovery/term-catalog";
-import type { TableProfile } from "../types";
-import type { DiscoveryReport, Relationship, SemanticModel } from "../types/discovery";
+import type { AppliedChange, GlossaryEntry } from "../../core/discovery/glossary";
+import type { OkfFile } from "../../core/discovery/okf-export";
+import { renderSemanticYaml } from "../../core/discovery/semantic-model";
+import type { TermEntry } from "../../core/discovery/term-catalog";
+import type { TableProfile } from "../../core/types";
+import type { DiscoveryReport, Relationship, SemanticModel } from "../../core/types/discovery";
 
 const ARTIFACT_DIR = ".querypad";
 const TERM_EMBEDDINGS_FILE = "term-embeddings.json";

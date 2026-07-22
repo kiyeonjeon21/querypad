@@ -1,5 +1,5 @@
-import type { ProfileColumnKind } from "../../types";
-import type { RelationshipSignals } from "../../types/discovery";
+import type { ProfileColumnKind } from "../types";
+import type { RelationshipSignals } from "../types/discovery";
 
 /**
  * Pure scoring helpers for relationship discovery. No DuckDB / IO — everything here

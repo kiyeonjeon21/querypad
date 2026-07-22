@@ -4,8 +4,8 @@ import type {
   ProfileTopValue,
   TableInfo,
   TableProfile,
-} from "../../types";
-import type { QueryRunner } from "../discovery/relationships";
+} from "../../core/types";
+import type { QueryRunner } from "../../core/discovery/relationships";
 import { classifyType, quoteIdent } from "../../core/sql/sql-utils";
 
 function toNumber(value: unknown): number | null {

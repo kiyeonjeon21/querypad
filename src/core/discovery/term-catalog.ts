@@ -1,4 +1,4 @@
-import type { SemanticModel } from "../../types/discovery";
+import type { SemanticModel } from "../types/discovery";
 
 /** What kind of surface term this is, and thus what it points at. */
 export type TermKind = "entity" | "synonym" | "dimension" | "measure";

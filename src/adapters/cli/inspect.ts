@@ -1,12 +1,12 @@
 import path from "node:path";
-import { discoverRelationships } from "../lib/discovery/relationships";
-import { buildSemanticModel } from "../lib/discovery/semantic-model";
-import { buildTermCatalog } from "../lib/discovery/term-catalog";
-import { createNodeDb } from "../lib/duckdb-node/connection";
-import { loadFolder } from "../lib/duckdb-node/load";
-import { profileTable } from "../lib/duckdb-node/profile";
-import { EMBED_DIM, EMBED_MODEL, type Embedder } from "../lib/embed/embedder";
-import type { DiscoveryReport } from "../types/discovery";
+import { discoverRelationships } from "../../core/discovery/relationships";
+import { buildSemanticModel } from "../../core/discovery/semantic-model";
+import { buildTermCatalog } from "../../core/discovery/term-catalog";
+import { createNodeDb } from "../../engine/duckdb/connection";
+import { loadFolder } from "../../engine/duckdb/load";
+import { profileTable } from "../../engine/duckdb/profile";
+import { EMBED_DIM, EMBED_MODEL, type Embedder } from "../../embed/embedder";
+import type { DiscoveryReport } from "../../core/types/discovery";
 import { writeArtifacts, writeTermEmbeddings } from "./artifacts";
 
 export interface InspectOptions {

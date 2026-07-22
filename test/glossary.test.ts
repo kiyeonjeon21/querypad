@@ -3,10 +3,10 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { runEnrich, type GlossaryAi } from "../src/cli/enrich";
-import { loadDoc } from "../src/cli/loaders";
-import { mergeGlossary, parseGlossary } from "../src/lib/discovery/glossary";
-import type { SemanticModel } from "../src/types/discovery";
+import { runEnrich, type GlossaryAi } from "../src/adapters/cli/enrich";
+import { loadDoc } from "../src/adapters/cli/loaders";
+import { mergeGlossary, parseGlossary } from "../src/core/discovery/glossary";
+import type { SemanticModel } from "../src/core/types/discovery";
 
 async function tempFile(name: string, content: string): Promise<string> {
   const dir = await mkdtemp(path.join(tmpdir(), "grain-glossary-"));

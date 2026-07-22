@@ -28,6 +28,9 @@ Usage:
                                    tools (describe_dataset, list_tables, describe_table,
                                    sample_table, resolve_terms, query_metric, run_sql) to
                                    Claude Code / Cursor. Accepts --db/--schema/--out too.
+  querypad eval <engine|agent>     Score the engine (deterministic, no API key) or the agent
+                                   (needs a key) against evals/cases/. --json for raw output;
+                                   agent accepts --cases <id,…> and --repeat <n>.
   querypad help                    Show this help
 
 External databases (inspect · ask · enrich):
@@ -168,6 +171,18 @@ async function main(argv: string[]): Promise<number> {
       const { positionals, flags } = parseArgs(rest);
       const out = stringFlag(flags, "out") ?? positionals[0] ?? ".";
       return runExportOkf(path.resolve(out));
+    }
+    case "eval": {
+      const { positionals, flags } = parseArgs(rest);
+      const { runEval } = await import("./eval");
+      const repeat = typeof flags.repeat === "string" ? Number(flags.repeat) : undefined;
+      return runEval({
+        suite: positionals[0] ?? "engine",
+        json: flags.json === true,
+        only: typeof flags.cases === "string" ? flags.cases.split(",") : undefined,
+        repeat: repeat && Number.isFinite(repeat) ? repeat : undefined,
+        provider: stringFlag(flags, "provider"),
+      });
     }
     case "mcp": {
       const { positionals, flags } = parseArgs(rest);

@@ -4,15 +4,9 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { buildAskContext } from "../../core/agent/ask-context";
 import { createDataToolkit, type DataToolkit } from "../../core/agent/toolkit";
-import { discoverRelationships } from "../../core/discovery/relationships";
-import { buildSemanticModel } from "../../core/discovery/semantic-model";
-import { applyVerdicts } from "../../core/discovery/verdicts";
-import type { Relationship } from "../../core/types/discovery";
+import { prepareDataset } from "../dataset";
 import { createNodeDb } from "../../engine/duckdb/connection";
-import { profileTable } from "../../engine/duckdb/profile";
-import { readArtifacts, readVerdicts } from "../cli/artifacts";
 import type { Source } from "../cli/source";
 
 export const SERVER_NAME = "querypad";
@@ -50,32 +44,13 @@ export interface PreparedTools {
 export async function prepareTools(deps: McpServerDeps): Promise<PreparedTools> {
   const db = await (deps.createDb ?? createNodeDb)();
   try {
-    const { tables } = await deps.source.load(db.runner);
-    if (tables.length === 0) throw new Error(deps.source.emptyMessage);
-
-    const cached = await readArtifacts(deps.source.outDir);
-    const now = Date.now();
-    let profiles = cached.profiles ?? undefined;
-    let inferred: Relationship[];
-    if (cached.relationships) {
-      inferred = cached.relationships;
-    } else {
-      profiles =
-        profiles ?? (await Promise.all(tables.map((t) => profileTable(t, db.runner, now))));
-      inferred = await discoverRelationships(profiles, db.runner);
-    }
-    const { relationships } = applyVerdicts(inferred, await readVerdicts(deps.source.outDir));
-
-    const model = buildSemanticModel(
-      tables.map((t) => t.name),
-      relationships,
-      now,
-      profiles
+    const { tables, relationships, model, context } = await prepareDataset(
+      deps.source,
+      db.runner
     );
-
     return {
       toolkit: createDataToolkit({ tables, model, relationships, runner: db.runner }),
-      context: buildAskContext({ tables, relationships, semanticModel: model }),
+      context,
       close: db.close,
     };
   } catch (error) {

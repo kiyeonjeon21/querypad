@@ -1,0 +1,130 @@
+[
+  {
+    "id": "rel-order-items-orders",
+    "kind": "relationship",
+    "describe": "order_items.order_id references orders.id",
+    "edge": "order_items.order_id->orders.id",
+    "minConfidence": 90
+  },
+  {
+    "id": "rel-order-items-products",
+    "kind": "relationship",
+    "describe": "order_items.product_id references products.id",
+    "edge": "order_items.product_id->products.id",
+    "minConfidence": 90
+  },
+  {
+    "id": "rel-orders-customers",
+    "kind": "relationship",
+    "describe": "orders.customer_id references customers.id",
+    "edge": "orders.customer_id->customers.id",
+    "minConfidence": 90
+  },
+  {
+    "id": "rel-products-categories",
+    "kind": "relationship",
+    "describe": "products.category_id references categories.id",
+    "edge": "products.category_id->categories.id",
+    "minConfidence": 90
+  },
+  {
+    "id": "rel-tickets-customers",
+    "kind": "relationship",
+    "describe": "support_tickets.customer_id references customers.id (second has_many off customers)",
+    "edge": "support_tickets.customer_id->customers.id",
+    "minConfidence": 90
+  },
+  {
+    "id": "rel-billing-region",
+    "kind": "relationship",
+    "describe": "the ambiguous pair: billing_region_id is found despite competing with shipping_region_id",
+    "edge": "orders.billing_region_id->regions.id",
+    "minConfidence": 70
+  },
+  {
+    "id": "rel-shipping-region",
+    "kind": "relationship",
+    "describe": "the ambiguous pair: shipping_region_id is found too — competition must not collapse them",
+    "edge": "orders.shipping_region_id->regions.id",
+    "minConfidence": 70
+  },
+  {
+    "id": "rel-no-spurious-id-join",
+    "kind": "relationship",
+    "describe": "no spurious edge between unrelated id columns (categories.id vs regions.id overlap numerically)",
+    "edge": "categories.id->regions.id",
+    "absent": true
+  },
+  {
+    "id": "entity-customer",
+    "kind": "entity",
+    "describe": "Customer entity derives from customers with a plan dimension and a row count",
+    "entity": "Customer",
+    "table": "customers",
+    "measures": ["customers_count"],
+    "dimensions": ["plan"]
+  },
+  {
+    "id": "entity-order-item",
+    "kind": "entity",
+    "describe": "OrderItem exposes a summable quantity — the measure revenue questions build on",
+    "entity": "OrderItem",
+    "table": "order_items",
+    "measures": ["order_items_count", "sum_quantity"]
+  },
+  {
+    "id": "entity-product",
+    "kind": "entity",
+    "describe": "Product exposes unit_price as a measure and is grouped by name",
+    "entity": "Product",
+    "table": "products",
+    "measures": ["sum_unit_price"]
+  },
+  {
+    "id": "metric-count-compiles",
+    "kind": "metric",
+    "describe": "a plain count on the entity's own table compiles",
+    "metric": { "metric": "customers_count" }
+  },
+  {
+    "id": "metric-count-by-own-dimension",
+    "kind": "metric",
+    "describe": "counting customers grouped by their own plan compiles",
+    "metric": { "metric": "customers_count", "dimensions": ["plan"] }
+  },
+  {
+    "id": "metric-refuses-fanout",
+    "kind": "metric",
+    "describe": "summing order_items quantity grouped by a customer dimension must be REFUSED — the join fans the measure out",
+    "metric": { "metric": "sum_quantity", "dimensions": ["plan"] },
+    "expectRefusal": true
+  },
+  {
+    "id": "metric-refuses-unknown",
+    "kind": "metric",
+    "describe": "an undefined metric is refused rather than guessed",
+    "metric": { "metric": "total_revenue" },
+    "expectRefusal": true
+  },
+  {
+    "id": "term-customers",
+    "kind": "term",
+    "describe": "\"customers\" resolves to the Customer entity",
+    "term": "customers",
+    "resolvesTo": "customers"
+  },
+  {
+    "id": "term-plan",
+    "kind": "term",
+    "describe": "\"plan\" resolves to the customers.plan dimension",
+    "term": "plan",
+    "resolvesTo": "customers.plan"
+  },
+  {
+    "id": "term-order-items",
+    "kind": "term",
+    "describe": "\"order items\" resolves to the OrderItem entity despite the space",
+    "term": "order items",
+    "resolvesTo": "order_items"
+  }
+]

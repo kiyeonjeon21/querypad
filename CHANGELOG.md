@@ -5,6 +5,23 @@ and public product updates.
 
 ## Unreleased
 
+### Eval harness
+
+- New `querypad eval <engine|agent>` command scoring both layers against `evals/dataset/`,
+  a committed dataset built so careless answers are measurably wrong (fan-out, multi-hop,
+  ambiguous dual foreign keys, distinct-vs-count, null joins)
+- **Engine suite** (`npm run eval:engine`): deterministic, needs no API key, gates CI. Scores
+  relationship inference + confidence, entity/dimension/measure derivation, metric compilation
+  including the refusals that prevent fan-out, and term resolution
+- **Agent suite** (`npm run eval:agent`): runs each question through the real agent loop and
+  compares result rows against ground truth from the case's `expectedSql`. Grading is
+  value-based — column names and row order are ignored — so any correct SQL formulation passes
+  while a wrong join is caught by the number. Cases can also assert tool usage and a step budget
+- `--repeat N` surfaces run-to-run non-determinism; `--cases a,b` narrows a run; reports are
+  written to `.datactx/evals/` for diffing
+- Dataset preparation (load → curate → model → grounding context) is now one shared
+  `prepareDataset`, consumed by `ask`, the MCP server, and both eval suites
+
 ### MCP server
 
 - New `querypad mcp [folder]` command: serves the read-only toolkit over stdio so

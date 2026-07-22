@@ -12,11 +12,13 @@ See `ROADMAP.md` for the layered plan.
 
 - `src/core/` - pure logic with **zero npm dependencies** (discovery, agent loop, sql utils, formatters, types).
   Keep it that way: no Node built-ins beyond types, no fetch, no fs.
-- `src/engine/` - `QueryRunner` implementations. `engine/duckdb` binds native `@duckdb/node-api`.
+- `src/engine/` - `QueryRunner` implementations. `engine/duckdb` binds native `@duckdb/node-api` for files; `engine/attach` attaches external Postgres/MySQL/SQLite read-only and exposes their tables as pushdown views.
+  Anything that reaches an external database must stay `READ_ONLY` and must never let a credential into a log line or an artifact (`redactConnectionString`).
 - `src/ai/` - provider-agnostic LLM completion (Anthropic / OpenAI, BYOK). Credentials come from env via `adapters/cli/ai-env.ts`.
 - `src/embed/` - embedding interface; `@huggingface/transformers` is an **optionalDependency**, loaded only via dynamic import.
 - `src/adapters/` - thin, replaceable surfaces. `adapters/cli` is the only one today; an MCP server lands beside it.
   Surfaces depend on core/engine, never the reverse.
+  `adapters/cli/source.ts` resolves a folder or a `--db` connection into one `Source`, so commands never branch on where the tables came from.
 
 The tsconfig has `lib: ["ES2022"]` with **no DOM** on purpose - browser APIs in
 core/engine are a type error, not a code-review catch.

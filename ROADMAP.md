@@ -39,6 +39,7 @@ Layer 4  AI Analyst          →  question → semantic model → SQL → execut
 | 4 — AI Analyst | `querypad ask`: NL → agentic tool-using loop (explore → SQL → self-correct → insight) | ✅ Built |
 | `querypad explain` | Justify each relationship from stored `RelationshipSignals` + caveats | ✅ Built |
 | AI Verification | `.datactx/verdicts.json`: reject/override inferred joins; honored by inspect/ask/explain | ✅ Built (CLI) |
+| External databases | `--db` attaches Postgres/MySQL/SQLite read-only; tables become pushdown views | ✅ Built |
 | MCP server | Expose `inspect`/`ask`/`explain` as typed agent tools | 🚧 Planned (step 5 below) |
 
 ## Built today
@@ -77,7 +78,8 @@ src/core/       pure logic, zero npm deps: discovery (signals · relationships �
                 semantic-model · explain · verdicts · compile-metric · glossary ·
                 okf-export · term-catalog · term-search · sql-safety) · agent loop ·
                 sql utils · formatters · types
-src/engine/     QueryRunner implementations (duckdb: native @duckdb/node-api)
+src/engine/     QueryRunner implementations: duckdb (files, native @duckdb/node-api) ·
+                attach (external Postgres/MySQL/SQLite, read-only pushdown views)
 src/ai/         complete.ts (shared streaming) · generate-sql.ts · providers.ts
 src/embed/      embedding interface + optional Transformers.js backend
 src/adapters/   cli (index · inspect · ask · explain · enrich · export-okf ·
@@ -190,9 +192,13 @@ competitor is cloud/warehouse-native. Build one step at a time:
       folds descriptions/synonyms into the model. ✅ Built.
    5. OKF (Google Open Knowledge Format, MD+frontmatter) export for agent-ecosystem interop
       (`querypad export-okf` → `.datactx/okf/`). ✅ Built.
-3. **External databases via DuckDB ATTACH** — postgres/mysql/sqlite extensions make the
-   engine's `QueryRunner` (one line: sql → rows) work over real warehouses, no JDBC/DBeaver.
-   Surface-independent; raises the value of every layer above it.
+3. **External databases via DuckDB ATTACH** — ✅ Built. `--db postgres://… | mysql://… |
+   sqlite:…` attaches read-only (DuckDB enforces it) and exposes each source table as a
+   **view**, so nothing is copied and profiling / value-overlap / joins push down to the
+   source engine. A `Source` abstraction (`src/adapters/cli/source.ts`) makes a folder and
+   a database interchangeable to `inspect`, `ask`, and `enrich`; `--schema` scopes the
+   discovery and `--out` places `.datactx/`. Credentials are redacted from every log line
+   and artifact.
 4. Verification step before answering + eval harness (question → expected-result pairs).
 5. **MCP server** — expose the read-only DuckDB tools to Claude Code / Cursor.
    With the web app retired this is the primary interactive surface strategy: the coding

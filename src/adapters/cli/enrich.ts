@@ -8,12 +8,12 @@ import {
 import { discoverRelationships } from "../../core/discovery/relationships";
 import { buildSemanticModel } from "../../core/discovery/semantic-model";
 import { createNodeDb } from "../../engine/duckdb/connection";
-import { loadFolder } from "../../engine/duckdb/load";
 import { profileTable } from "../../engine/duckdb/profile";
 import type { SemanticModel } from "../../core/types/discovery";
 import { resolveAiCredentials } from "./ai-env";
 import { writeGlossary, writeSemanticModel } from "./artifacts";
 import { loadDocs, type LoadedDoc } from "./loaders";
+import type { Source } from "./source";
 
 const GLOSSARY_SYSTEM_PROMPT = `You extract a data glossary from business documents.
 You are given the real schema (tables and their columns) and one or more glossary documents.
@@ -29,7 +29,7 @@ export interface GlossaryAi {
 }
 
 export interface RunEnrichOptions {
-  folder: string;
+  source: Source;
   glossaryPaths: string[];
   apply?: boolean;
   provider?: string;
@@ -68,9 +68,9 @@ export async function runEnrich(options: RunEnrichOptions): Promise<EnrichResult
 
   const db = await createNodeDb();
   try {
-    const { tables } = await loadFolder(options.folder, db.runner);
+    const { tables } = await options.source.load(db.runner);
     if (tables.length === 0) {
-      throw new Error(`No supported data files found in ${options.folder}.`);
+      throw new Error(options.source.emptyMessage);
     }
 
     const now = Date.now();
@@ -91,13 +91,13 @@ export async function runEnrich(options: RunEnrichOptions): Promise<EnrichResult
     const entries = await ai.extract({ docs, schema });
     const { model: merged, applied } = mergeGlossary(model, entries);
 
-    await writeGlossary(options.folder, { generatedAt: now, entries, applied });
+    await writeGlossary(options.source.outDir, { generatedAt: now, entries, applied });
 
     log(`Extracted ${entries.length} glossary term(s); ${applied.length} applicable to the model.`);
     for (const change of applied) log(`  ${change.target} · ${change.field}: ${change.value}`);
 
     if (options.apply && applied.length > 0) {
-      await writeSemanticModel(options.folder, merged);
+      await writeSemanticModel(options.source.outDir, merged);
       log("Applied to semantic-model.yaml.");
     } else if (applied.length > 0) {
       log("Re-run with --apply to write these into semantic-model.yaml.");

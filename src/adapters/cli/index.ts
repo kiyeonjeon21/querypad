@@ -1,4 +1,3 @@
-#!/usr/bin/env -S npx tsx
 import { runAsk } from "./ask";
 import { runEnrich } from "./enrich";
 import { runExplain } from "./explain";

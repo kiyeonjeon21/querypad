@@ -24,6 +24,10 @@ Usage:
                                    with caveats to verify (reads .datactx/; run inspect first).
   querypad export-okf [folder]     Export the semantic model as an Open Knowledge Format
                                    (Markdown+frontmatter) bundle under .datactx/okf/.
+  querypad mcp [folder]            Run an MCP server over stdio, exposing the read-only
+                                   tools (describe_dataset, list_tables, describe_table,
+                                   sample_table, resolve_terms, query_metric, run_sql) to
+                                   Claude Code / Cursor. Accepts --db/--schema/--out too.
   querypad help                    Show this help
 
 External databases (inspect · ask · enrich):
@@ -164,6 +168,18 @@ async function main(argv: string[]): Promise<number> {
       const { positionals, flags } = parseArgs(rest);
       const out = stringFlag(flags, "out") ?? positionals[0] ?? ".";
       return runExportOkf(path.resolve(out));
+    }
+    case "mcp": {
+      const { positionals, flags } = parseArgs(rest);
+      const { runMcp } = await import("../mcp/server");
+      return runMcp({
+        source: resolveSource({
+          folder: positionals[0],
+          db: stringFlag(flags, "db"),
+          schema: stringFlag(flags, "schema"),
+          out: stringFlag(flags, "out"),
+        }),
+      });
     }
     default:
       console.error(`Unknown command: ${command}\n`);

@@ -7,7 +7,7 @@ answers business questions using DuckDB.
 The execution layer is solved — DuckDB does it well. The unsolved problem is
 **dataset understanding**: which tables exist, what each field means, how datasets
 connect, which join is correct. That is the bottleneck this roadmap attacks, and
-the reason we build the understanding engine **CLI-first** before investing in UI.
+the reason the understanding engine is built **CLI-first**.
 
 **Surface decision (2026-07): terminal-first.** The browser app was retired
 (tag `web-final`, ~6k LOC removed); repeating it in a TUI would compete with
@@ -43,7 +43,8 @@ Layer 4  AI Analyst          →  question → semantic model → SQL → execut
 
 ## Built today
 
-Two CLI commands ship: `querypad inspect` (Layers 1–2) and `querypad ask` (Layer 4).
+Six commands ship: `inspect` (Layers 1–2), `ask` (Layer 4), `explain`, `enrich`,
+`export-okf`, and `help`.
 
 ```bash
 querypad inspect ./data
@@ -54,7 +55,7 @@ Tables:        3
 Relationships: 2
   payments.user_id ↳ users.id  (100%, many-to-one)
   events.user_id   ↳ users.id  (100%, many-to-one)
-Wrote artifacts to ./data/.querypad
+Wrote artifacts to ./data/.datactx
 ```
 
 ```bash
@@ -105,7 +106,7 @@ inspect-summary.md   human- and agent-readable overview
 Rolls inferred relationships into named business entities, stored as the source of truth.
 
 ```yaml
-# .querypad/semantic-model.yaml
+# .datactx/semantic-model.yaml
 entities:
   - name: User
     table: users
@@ -166,7 +167,7 @@ Question → grounded in relationships → agent loop { list/describe/sample →
   back to a single-shot pipeline. `--verbose` shows each tool step; `--show-sql` previews a
   single query without executing.
 
-## Next — deepening the agent (product renaming to **Grain**)
+## Next — deepening the agent
 
 Direction set from late-2025/2026 market research (competitive landscape, agentic
 architecture, naming). The moat is **semantic-first + local-first**: an agent grounded in a
@@ -244,14 +245,20 @@ reasons about the data directly:
 Claude Code  +  QueryPad  +  DuckDB
 ```
 
-A future MCP server can expose the same engine (`inspect`, `ask`, `describe`) as
-typed tools for agent workflows — a natural follow-on once Layers 3–4 land.
+Layers 3–4 have landed, so the MCP server (step 5) is the natural next surface:
+the same engine exposed as typed read-only tools, making the coding agent the
+interactive UI instead of a bespoke one.
 
 ## Principles
 
 - **Use DuckDB.** Do not build a database or a query engine.
 - **Understanding before UI.** Relationship inference and semantic modeling are the
-  bottleneck; a dashboard built before solving them is just another BI tool.
+  bottleneck; a dashboard built before solving them is just another BI tool. The
+  corollary, learned the expensive way: a surface that does not advance the
+  understanding engine is a liability, not an asset.
+- **Thin, replaceable surfaces.** The engine (`src/core`) has zero npm dependencies
+  and never touches a connection or an HTTP client. Surfaces live in `src/adapters`
+  and are cheap to add or delete.
 - **Local-first.** Computation and storage stay on the user's machine; AI is BYOK.
 - **Agent-native.** Artifacts are structured, typed, and token-efficient so agents
   can consume them directly.

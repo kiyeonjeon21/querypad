@@ -5,6 +5,21 @@ and public product updates.
 
 ## Unreleased
 
+### MCP server
+
+- New `querypad mcp [folder]` command: serves the read-only toolkit over stdio so
+  Claude Code / Cursor can analyze a dataset directly
+  (`claude mcp add querypad -- querypad mcp /path/to/data`). Accepts `--db`/`--schema`/`--out`
+- Tools: `describe_dataset` (grounding context — tables, inferred joins, entities/
+  dimensions/measures), `list_tables`, `describe_table`, `sample_table`, `resolve_terms`,
+  `query_metric`, `run_sql`
+- The tools are not a reimplementation: `createDataToolkit` (`src/core/agent/toolkit.ts`)
+  is one definition consumed by both the internal `ask` loop and the MCP server
+- Engine errors return as readable tool results rather than exceptions, so an agent on
+  either surface can self-correct; `run_sql` refuses non-read-only queries
+- The MCP SDK is bundled at build time, so the shipped CLI gains no runtime dependency
+  (and none of the SDK's HTTP-transport packages)
+
 ### External databases
 
 - New `--db` flag on `inspect`, `ask`, and `enrich`: attach a live **Postgres**,

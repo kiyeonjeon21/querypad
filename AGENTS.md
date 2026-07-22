@@ -16,9 +16,11 @@ See `ROADMAP.md` for the layered plan.
   Anything that reaches an external database must stay `READ_ONLY` and must never let a credential into a log line or an artifact (`redactConnectionString`).
 - `src/ai/` - provider-agnostic LLM completion (Anthropic / OpenAI, BYOK). Credentials come from env via `adapters/cli/ai-env.ts`.
 - `src/embed/` - embedding interface; `@huggingface/transformers` is an **optionalDependency**, loaded only via dynamic import.
-- `src/adapters/` - thin, replaceable surfaces. `adapters/cli` is the only one today; an MCP server lands beside it.
+- `src/adapters/` - thin, replaceable surfaces: `adapters/cli` and `adapters/mcp` (stdio MCP server).
   Surfaces depend on core/engine, never the reverse.
   `adapters/cli/source.ts` resolves a folder or a `--db` connection into one `Source`, so commands never branch on where the tables came from.
+  `core/agent/toolkit.ts` is the **single** definition of the read-only agent tools; the `ask` loop and the MCP server both consume it. Add a tool there, not in a surface.
+  The MCP SDK is a devDependency on purpose - tsup bundles it (`noExternal`) so the shipped CLI carries none of its HTTP-transport deps. Keep `dependencies` at one entry.
 
 The tsconfig has `lib: ["ES2022"]` with **no DOM** on purpose - browser APIs in
 core/engine are a type error, not a code-review catch.

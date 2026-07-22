@@ -2,7 +2,7 @@
   "name": "querypad",
   "version": "0.7.0",
   "private": true,
-  "description": "Cursor for Data — a local-first AI CLI that understands datasets (discovers relationships, builds semantic models) and analyzes them with DuckDB.",
+  "description": "Cursor for Data \u2014 a local-first AI CLI that understands datasets (discovers relationships, builds semantic models) and analyzes them with DuckDB.",
   "author": "QueryPad Contributors",
   "license": "MIT",
   "repository": {
@@ -20,21 +20,23 @@
     "node": ">=20"
   },
   "keywords": [
-    "cursor-for-data",
-    "duckdb",
-    "sql",
     "ai",
-    "llm",
-    "data-understanding",
-    "relationship-discovery",
-    "semantic-model",
-    "schema-inference",
-    "data-analysis",
-    "csv",
-    "parquet",
-    "cli",
     "claude",
-    "local-first"
+    "cli",
+    "csv",
+    "cursor-for-data",
+    "data-analysis",
+    "data-understanding",
+    "duckdb",
+    "llm",
+    "local-first",
+    "mcp",
+    "model-context-protocol",
+    "parquet",
+    "relationship-discovery",
+    "schema-inference",
+    "semantic-model",
+    "sql"
   ],
   "scripts": {
     "querypad": "tsx src/adapters/cli/index.ts",
@@ -53,6 +55,7 @@
     "@huggingface/transformers": "^3.8.1"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@types/node": "^20",
     "eslint": "^9",
     "tsup": "^8.5.1",

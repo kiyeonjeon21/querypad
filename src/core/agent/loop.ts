@@ -8,12 +8,9 @@ import type {
   ToolUseBlock,
 } from "../../ai/complete";
 import type { Relationship, SemanticModel } from "../types/discovery";
-import { compileMetric, type MetricRequest } from "../discovery/compile-metric";
 import type { QueryRunner } from "../discovery/relationships";
-import { isReadOnlyQuery } from "../discovery/sql-safety";
-import { buildTermCatalog, formatTarget } from "../discovery/term-catalog";
-import { resolveTerms, type ResolvedTerm } from "../discovery/term-search";
-import { quoteIdent } from "../sql/sql-utils";
+import type { ResolvedTerm } from "../discovery/term-search";
+import { createDataToolkit } from "./toolkit";
 
 /** Preamble prepended to the grounding context to steer the agent. */
 export const AGENT_SYSTEM_PROMPT = `You are a data analyst agent working over a local, read-only DuckDB database.
@@ -73,109 +70,6 @@ export interface RunAgentQueryOptions {
   onStep?: (step: AgentStep) => void;
 }
 
-const TOOL_DEFINITIONS: ToolDefinition[] = [
-  {
-    name: "list_tables",
-    description: "List the available tables with their row counts.",
-    input_schema: { type: "object", properties: {} },
-  },
-  {
-    name: "describe_table",
-    description: "Show the columns and types of a table.",
-    input_schema: {
-      type: "object",
-      properties: { table: { type: "string", description: "Table name." } },
-      required: ["table"],
-    },
-  },
-  {
-    name: "sample_table",
-    description: "Return a few sample rows from a table.",
-    input_schema: {
-      type: "object",
-      properties: {
-        table: { type: "string", description: "Table name." },
-        limit: { type: "integer", description: "Number of rows (1-50, default 5)." },
-      },
-      required: ["table"],
-    },
-  },
-  {
-    name: "resolve_terms",
-    description:
-      "Map a natural-language word or phrase (e.g. a synonym like 'customers' or 'revenue') to the matching entities, columns, or metrics. Use it when the user's wording doesn't obviously match a table/column.",
-    input_schema: {
-      type: "object",
-      properties: { query: { type: "string", description: "A word or phrase to resolve." } },
-      required: ["query"],
-    },
-  },
-  {
-    name: "query_metric",
-    description:
-      "Compute a defined metric (see the entity 'measures' in context), optionally grouped by dimensions and filtered. Prefer this over run_sql when a metric exists — it emits correct, join-guarded SQL.",
-    input_schema: {
-      type: "object",
-      properties: {
-        metric: { type: "string", description: "A measure name, e.g. sum_amount." },
-        dimensions: {
-          type: "array",
-          items: { type: "string" },
-          description: "Dimension names to group by.",
-        },
-        filters: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              column: { type: "string" },
-              op: { type: "string", enum: ["=", "!=", "<", "<=", ">", ">="] },
-              value: {},
-            },
-            required: ["column", "op", "value"],
-          },
-          description: "Filters applied as a WHERE clause.",
-        },
-      },
-      required: ["metric"],
-    },
-  },
-  {
-    name: "run_sql",
-    description: "Execute a read-only SQL query (SELECT/WITH/…) and return the rows as JSON.",
-    input_schema: {
-      type: "object",
-      properties: { query: { type: "string", description: "A read-only SQL query." } },
-      required: ["query"],
-    },
-  },
-];
-
-function toJsonScalar(value: unknown): unknown {
-  if (typeof value === "bigint") return Number(value);
-  if (value instanceof Date) return value.toISOString();
-  if (value && typeof value === "object" && "valueOf" in value) {
-    const unwrapped = (value as { valueOf(): unknown }).valueOf();
-    if (unwrapped !== value) return toJsonScalar(unwrapped);
-  }
-  return value;
-}
-
-function rowsToJson(rows: Record<string, unknown>[], cap = 50): string {
-  const capped = rows.slice(0, cap).map((row) => {
-    const out: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(row)) out[key] = toJsonScalar(value);
-    return out;
-  });
-  const omitted = rows.length - capped.length;
-  const note = omitted > 0 ? `\n(${omitted} more row(s) omitted)` : "";
-  return JSON.stringify(capped) + note;
-}
-
-function columnsOf(rows: Record<string, unknown>[]): string[] {
-  return rows.length > 0 ? Object.keys(rows[0]) : [];
-}
-
 function textFrom(content: ContentBlock[]): string {
   return content
     .filter((block): block is { type: "text"; text: string } => block.type === "text")
@@ -196,78 +90,25 @@ function toolUsesFrom(content: ContentBlock[]): ToolUseBlock[] {
 export async function runAgentQuery(options: RunAgentQueryOptions): Promise<AgentQueryResult> {
   const { question, context, tables, model, relationships, runner, complete } = options;
   const maxSteps = options.maxSteps ?? 8;
-  const lexicalCatalog = buildTermCatalog(model);
-  const resolve = options.resolveTerms ?? (async (query: string) => resolveTerms(lexicalCatalog, query));
   const system = `${AGENT_SYSTEM_PROMPT}\n\n${context}`;
 
-  const knownTables = new Map(tables.map((table) => [table.name, table]));
   const sqlHistory: string[] = [];
   const steps: AgentStep[] = [];
   let lastResult: AgentResultRows | null = null;
 
-  async function runTool(name: string, input: Record<string, unknown>): Promise<string> {
-    switch (name) {
-      case "list_tables":
-        return tables.length > 0
-          ? tables.map((t) => `${t.name} (${t.rowCount} rows)`).join("\n")
-          : "No tables are loaded.";
-      case "describe_table": {
-        const table = knownTables.get(String(input.table));
-        if (!table) {
-          return `Unknown table "${input.table}". Available: ${[...knownTables.keys()].join(", ")}`;
-        }
-        return table.columns.map((c) => `${c.name}: ${c.type}`).join("\n");
-      }
-      case "sample_table": {
-        const name = String(input.table);
-        if (!knownTables.has(name)) {
-          return `Unknown table "${name}". Available: ${[...knownTables.keys()].join(", ")}`;
-        }
-        const raw = typeof input.limit === "number" ? input.limit : 5;
-        const limit = Math.max(1, Math.min(50, Math.trunc(raw)));
-        const rows = await runner(`SELECT * FROM ${quoteIdent(name)} LIMIT ${limit}`);
-        return rowsToJson(rows);
-      }
-      case "resolve_terms": {
-        const results = await resolve(String(input.query ?? ""));
-        if (results.length === 0) return "No matching terms.";
-        return results
-          .map((r) => `${r.entry.term} (${r.entry.kind}) → ${formatTarget(r.entry.target)}`)
-          .join("\n");
-      }
-      case "query_metric": {
-        const request: MetricRequest = {
-          metric: String(input.metric ?? ""),
-          dimensions: Array.isArray(input.dimensions) ? input.dimensions.map(String) : undefined,
-          filters: Array.isArray(input.filters)
-            ? (input.filters as MetricRequest["filters"])
-            : undefined,
-        };
-        const compiled = compileMetric(model, relationships, request);
-        if (!compiled.ok) return compiled.error;
-        sqlHistory.push(compiled.sql);
-        const rows = await runner(compiled.sql);
-        lastResult = { columns: columnsOf(rows), rows };
-        return rowsToJson(rows);
-      }
-      case "run_sql": {
-        const query = String(input.query ?? "");
-        if (!isReadOnlyQuery(query)) {
-          return "Refusing to run non-read-only SQL. Only read-only queries (SELECT/WITH/…) are allowed.";
-        }
-        const rows = await runner(query);
-        lastResult = { columns: columnsOf(rows), rows };
-        return rowsToJson(rows);
-      }
-      default:
-        return `Unknown tool "${name}".`;
-    }
-  }
+  // The same read-only toolkit the MCP server exposes — one definition, two surfaces.
+  const toolkit = createDataToolkit({
+    tables,
+    model,
+    relationships,
+    runner,
+    resolveTerms: options.resolveTerms,
+  });
 
   const messages: ChatMessage[] = [{ role: "user", content: question }];
 
   for (let turn = 0; turn < maxSteps; turn += 1) {
-    const { content } = await complete({ system, messages, tools: TOOL_DEFINITIONS });
+    const { content } = await complete({ system, messages, tools: toolkit.definitions });
     messages.push({ role: "assistant", content });
 
     const toolUses = toolUsesFrom(content);
@@ -278,17 +119,11 @@ export async function runAgentQuery(options: RunAgentQueryOptions): Promise<Agen
     const toolResults: ToolResultBlock[] = [];
     for (const use of toolUses) {
       const input = use.input ?? {};
-      if (use.name === "run_sql" && typeof input.query === "string") {
-        sqlHistory.push(input.query);
-      }
-      let output: string;
-      let isError = false;
-      try {
-        output = await runTool(use.name, input);
-      } catch (err) {
-        output = `SQL error: ${err instanceof Error ? err.message : String(err)}`;
-        isError = true;
-      }
+      const outcome = await toolkit.run(use.name, input);
+      const output = outcome.text;
+      const isError = outcome.isError ?? false;
+      if (outcome.sql) sqlHistory.push(outcome.sql);
+      if (outcome.rows) lastResult = outcome.rows;
       const step: AgentStep = { tool: use.name, input, output, isError };
       steps.push(step);
       options.onStep?.(step);

@@ -16,8 +16,8 @@ QueryPad answers those questions first, then generates and runs the SQL.
  data files  │  profile → relationships     │   (schema · relationships ·
              │  → semantic model → agent    │    semantic model · verdicts)
              └──────────────────────────────┘
-               terminal-first: CLI today,
-               MCP server next
+               terminal-first surfaces:
+               CLI · MCP server
 ```
 
 ## Install
@@ -142,6 +142,30 @@ Use `--verbose` to see each tool step, `--steps <n>` to cap the turns, or `--sho
 `resolve_terms` is lexical by default; run `querypad inspect --embed` once to precompute a local-model embedding cache, and `ask` then fuses lexical + vector (RRF) for semantic matches.
 Piped output (`querypad ask ... | ...`) switches result tables to TSV.
 
+## `mcp`: hand the engine to your coding agent
+
+```bash
+querypad mcp ./data          # or: querypad mcp --db postgres://user@host/shop
+```
+
+Runs an MCP server over stdio exposing the **same read-only tools `ask` uses internally**, so Claude Code or Cursor becomes the analyst instead of a bespoke UI:
+
+| Tool | What it does |
+|---|---|
+| `describe_dataset` | The grounding context: tables, inferred joins with confidence, entities/dimensions/measures. **Call this first.** |
+| `list_tables` · `describe_table` · `sample_table` | Explore the schema |
+| `resolve_terms` | "customers" → User, "revenue" → sum_amount |
+| `query_metric` | Compile a defined metric into correct, join-guarded SQL |
+| `run_sql` | Read-only SQL; writes are refused, errors come back readable so the agent self-corrects |
+
+Register it with Claude Code:
+
+```bash
+claude mcp add querypad -- querypad mcp /path/to/data
+```
+
+The agent never sees a write path: `run_sql` is read-only-gated, and with `--db` the attachment is `READ_ONLY` at the DuckDB level too.
+
 ## `explain`: justify every join
 
 ```bash
@@ -211,7 +235,8 @@ A confidence score blends four signals - value overlap (dominant), name similari
 | **2 - Relationship Discovery** | Infer joins automatically with confidence scores | ✅ Built |
 | **3 - Semantic Model** | Entities + dimensions/measures/synonyms, metric compiler, term resolution, glossary, OKF | ✅ Built |
 | **4 - AI Analyst** | Question → agentic tool-using loop (explore → SQL → self-correct → insight) | ✅ Built |
-| **MCP server** | Expose the read-only engine as typed tools for Claude Code / Cursor | 🚧 Next |
+| **External databases** | `--db` attaches Postgres/MySQL/SQLite read-only as pushdown views | ✅ Built |
+| **MCP server** | `querypad mcp` exposes the read-only toolkit to Claude Code / Cursor | ✅ Built |
 
 See [ROADMAP.md](ROADMAP.md) for the full plan.
 
@@ -222,7 +247,7 @@ src/core/      pure logic, zero npm deps (discovery · agent · sql · format ·
 src/engine/    QueryRunner implementations (duckdb: files; attach: external DBs)
 src/ai/        provider-agnostic LLM completion (Anthropic / OpenAI, BYOK)
 src/embed/     embedding interface + optional Transformers.js backend
-src/adapters/  thin, replaceable surfaces (cli today; mcp next)
+src/adapters/  thin, replaceable surfaces (cli, mcp)
 ```
 
 The core never touches a concrete database connection or an HTTP client - both

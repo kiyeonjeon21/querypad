@@ -12,7 +12,7 @@ the reason the understanding engine is built **CLI-first**.
 **Surface decision (2026-07): terminal-first.** The browser app was retired
 (tag `web-final`, ~6k LOC removed); repeating it in a TUI would compete with
 polished terminal SQL IDEs (Harlequin) on ground that is not our moat. The
-surfaces are the CLI today, an MCP server next, and possibly a dedicated
+surfaces are the CLI and an MCP server today, and possibly a dedicated
 terminal host later (cmux demonstrates the shape: a native host embedding
 libghostty that runs agents — our CLI would be a first-class citizen inside
 it, not a reimplementation).
@@ -40,7 +40,7 @@ Layer 4  AI Analyst          →  question → semantic model → SQL → execut
 | `querypad explain` | Justify each relationship from stored `RelationshipSignals` + caveats | ✅ Built |
 | AI Verification | `.datactx/verdicts.json`: reject/override inferred joins; honored by inspect/ask/explain | ✅ Built (CLI) |
 | External databases | `--db` attaches Postgres/MySQL/SQLite read-only; tables become pushdown views | ✅ Built |
-| MCP server | Expose `inspect`/`ask`/`explain` as typed agent tools | 🚧 Planned (step 5 below) |
+| MCP server | `querypad mcp` exposes the read-only toolkit over stdio to Claude Code / Cursor | ✅ Built |
 
 ## Built today
 
@@ -83,7 +83,7 @@ src/engine/     QueryRunner implementations: duckdb (files, native @duckdb/node-
 src/ai/         complete.ts (shared streaming) · generate-sql.ts · providers.ts
 src/embed/      embedding interface + optional Transformers.js backend
 src/adapters/   cli (index · inspect · ask · explain · enrich · export-okf ·
-                artifacts · render) — mcp lands beside it
+                artifacts · render) · mcp (stdio server over the shared toolkit)
 ```
 
 Relationship discovery: profile each table → find primary-key candidates (unique,
@@ -200,9 +200,12 @@ competitor is cloud/warehouse-native. Build one step at a time:
    discovery and `--out` places `.datactx/`. Credentials are redacted from every log line
    and artifact.
 4. Verification step before answering + eval harness (question → expected-result pairs).
-5. **MCP server** — expose the read-only DuckDB tools to Claude Code / Cursor.
-   With the web app retired this is the primary interactive surface strategy: the coding
-   agent is the UI.
+5. **MCP server** — ✅ Built. `querypad mcp` serves the read-only toolkit over stdio. The
+   tools are not a reimplementation: `createDataToolkit` (`src/core/agent/toolkit.ts`) is
+   the single definition that both the internal `ask` loop and the MCP server consume, so
+   an external agent sees exactly the tools our own agent uses — plus `describe_dataset`,
+   which hands over the grounding context `ask` would otherwise put in its system prompt.
+   With the web app retired this is the interactive surface: the coding agent is the UI.
 6. Short planning/decomposition for multi-part questions (bounded).
 7. **Terminal host experiment** — integrate with cmux (scriptable CLI + socket API +
    sidebar) before considering a dedicated libghostty host; only build one if the

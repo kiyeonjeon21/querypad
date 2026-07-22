@@ -1,6 +1,6 @@
 {
   "name": "querypad",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "description": "Cursor for Data — a local-first AI CLI that understands datasets (discovers relationships, builds semantic models) and analyzes them with DuckDB.",
   "author": "QueryPad Contributors",

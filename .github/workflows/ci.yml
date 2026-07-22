@@ -16,9 +16,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    container:
-      image: mcr.microsoft.com/playwright:v1.58.2-noble
-    timeout-minutes: 20
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -45,9 +43,5 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Run CLI tests
+      - name: Run CLI tests (unit + e2e)
         run: npm run test:cli
-
-      - name: Run e2e tests
-        timeout-minutes: 10
-        run: npm test -- --reporter=line

@@ -3,6 +3,7 @@ import test from "node:test";
 import { isReadOnlyQuery, stripSqlFences } from "../src/core/discovery/sql-safety";
 import { buildAskContext } from "../src/core/agent/ask-context";
 import { parseFollowups, runAsk, type AskAi } from "../src/adapters/cli/ask";
+import { resolveSource } from "../src/adapters/cli/source";
 import type { AgentComplete } from "../src/core/agent/loop";
 import type { ToolCompletion } from "../src/ai/complete";
 import type { Relationship } from "../src/core/types/discovery";
@@ -82,7 +83,7 @@ test("runAsk executes generated SQL over fixtures and returns results", async ()
   const lines: string[] = [];
   const result = await runAsk({
     question: "total payment amount by user plan",
-    folder: "fixtures/data",
+    source: resolveSource({ folder: "fixtures/data" }),
     // Fenced to also exercise stripSqlFences end-to-end.
     ai: stubAi("```sql\n" + JOIN_SQL + "\n```"),
     log: (line) => lines.push(line),
@@ -102,7 +103,7 @@ test("runAsk refuses to execute non-read-only generated SQL", async () => {
   await assert.rejects(
     runAsk({
       question: "delete everything",
-      folder: "fixtures/data",
+      source: resolveSource({ folder: "fixtures/data" }),
       ai: stubAi("DROP TABLE users"),
       log: () => {},
     }),
@@ -113,7 +114,7 @@ test("runAsk refuses to execute non-read-only generated SQL", async () => {
 test("runAsk --show-sql returns SQL without executing", async () => {
   const result = await runAsk({
     question: "anything",
-    folder: "fixtures/data",
+    source: resolveSource({ folder: "fixtures/data" }),
     showSql: true,
     ai: stubAi("```sql\nSELECT 1\n```"),
     log: () => {},
@@ -141,7 +142,7 @@ test("runAsk emits follow-up questions when the AI provides them", async () => {
   const followups = ["What is 7-day retention?", "Which plan churns most?"];
   const result = await runAsk({
     question: "total payment amount by user plan",
-    folder: "fixtures/data",
+    source: resolveSource({ folder: "fixtures/data" }),
     ai: {
       ...stubAi(JOIN_SQL),
       generateFollowups: async () => followups,
@@ -187,7 +188,7 @@ test("agent loop self-corrects a failing query, then converges on the answer", a
   const lines: string[] = [];
   const result = await runAsk({
     question: "total payment amount by user plan",
-    folder: "fixtures/data",
+    source: resolveSource({ folder: "fixtures/data" }),
     ai: agentAi([
       toolUse("t1", "run_sql", { query: "SELECT nonexistent_col FROM users" }),
       toolUse("t2", "run_sql", { query: JOIN_SQL }),
@@ -220,7 +221,7 @@ test("agent loop self-corrects a failing query, then converges on the answer", a
 test("agent computes a defined metric via query_metric (guarded join, real DuckDB)", async () => {
   const result = await runAsk({
     question: "total amount by plan",
-    folder: "fixtures/data",
+    source: resolveSource({ folder: "fixtures/data" }),
     ai: agentAi([
       toolUse("m1", "query_metric", { metric: "sum_amount", dimensions: ["plan"] }),
       textReply("Paid-plan users account for all payment volume."),
@@ -239,7 +240,7 @@ test("agent computes a defined metric via query_metric (guarded join, real DuckD
 test("agent resolves a term to schema via resolve_terms (lexical fallback)", async () => {
   const result = await runAsk({
     question: "what about plan",
-    folder: "fixtures/data",
+    source: resolveSource({ folder: "fixtures/data" }),
     ai: agentAi([
       toolUse("r1", "resolve_terms", { query: "plan" }),
       textReply("Resolved."),
@@ -254,7 +255,7 @@ test("agent resolves a term to schema via resolve_terms (lexical fallback)", asy
 test("agent loop refuses non-read-only SQL and never executes it", async () => {
   const result = await runAsk({
     question: "delete everything",
-    folder: "fixtures/data",
+    source: resolveSource({ folder: "fixtures/data" }),
     ai: agentAi([
       toolUse("t1", "run_sql", { query: "DROP TABLE users" }),
       textReply("I cannot modify the data; it is read-only."),
@@ -271,7 +272,7 @@ test("agent loop refuses non-read-only SQL and never executes it", async () => {
 test("agent mode is skipped when the AI has no agentComplete (single-shot fallback)", async () => {
   const result = await runAsk({
     question: "total payment amount by user plan",
-    folder: "fixtures/data",
+    source: resolveSource({ folder: "fixtures/data" }),
     ai: stubAi(JOIN_SQL),
     log: () => {},
   });

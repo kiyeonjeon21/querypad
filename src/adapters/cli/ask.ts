@@ -14,12 +14,12 @@ import { resolveTerms } from "../../core/discovery/term-search";
 import { applyVerdicts } from "../../core/discovery/verdicts";
 import { createTransformersEmbedder } from "../../embed/transformers-embedder";
 import { createNodeDb, type QueryResultRows } from "../../engine/duckdb/connection";
-import { loadFolder } from "../../engine/duckdb/load";
 import { profileTable } from "../../engine/duckdb/profile";
 import type { Relationship } from "../../core/types/discovery";
 import { resolveAiCredentials } from "./ai-env";
 import { readArtifacts, readTermEmbeddings, readVerdicts } from "./artifacts";
 import { renderTable, terminalRenderOptions } from "./render";
+import type { Source } from "./source";
 
 const ANALYST_SYSTEM_PROMPT = `You are a data analyst. Given a question, the SQL that was run, and a sample of the result rows, state the answer as a concise 1-3 sentence finding. No preamble, do not restate the SQL, do not apologize.`;
 
@@ -50,7 +50,7 @@ export interface AskAi {
 
 export interface RunAskOptions {
   question: string;
-  folder: string;
+  source: Source;
   provider?: string;
   showSql?: boolean;
   /** Max tool-using turns for the agent loop (default 8). */
@@ -121,16 +121,13 @@ export async function runAsk(options: RunAskOptions): Promise<AskResult> {
 
   const db = await createNodeDb();
   try {
-    const { tables } = await loadFolder(options.folder, db.runner);
+    const { tables } = await options.source.load(db.runner);
     if (tables.length === 0) {
-      throw new Error(
-        `No supported data files found in ${options.folder} ` +
-          "(.parquet, .csv, .tsv, .json, .jsonl, .ndjson)."
-      );
+      throw new Error(options.source.emptyMessage);
     }
 
     // Prefer cached .datactx/ artifacts; otherwise profile + discover on the fly.
-    const cached = await readArtifacts(options.folder);
+    const cached = await readArtifacts(options.source.outDir);
     const now = Date.now();
     let profiles = cached.profiles ?? undefined;
     let inferred: Relationship[];
@@ -142,7 +139,7 @@ export async function runAsk(options: RunAskOptions): Promise<AskResult> {
       inferred = await discoverRelationships(profiles, db.runner);
     }
     // Honor user curation (idempotent when the cache was already curated).
-    const { relationships } = applyVerdicts(inferred, await readVerdicts(options.folder));
+    const { relationships } = applyVerdicts(inferred, await readVerdicts(options.source.outDir));
 
     // Profiles enrich the model with dimensions/measures; undefined → entities only.
     const semanticModel = buildSemanticModel(
@@ -165,7 +162,7 @@ export async function runAsk(options: RunAskOptions): Promise<AskResult> {
     if (ai.agentComplete) {
       // Hybrid term resolution only when an embeddings cache exists (inspect --embed);
       // otherwise the loop falls back to lexical-only resolution built from the model.
-      const cachedEmbeddings = await readTermEmbeddings(options.folder);
+      const cachedEmbeddings = await readTermEmbeddings(options.source.outDir);
       let resolveTermsFn;
       if (cachedEmbeddings) {
         const embedder = createTransformersEmbedder();

@@ -1,8 +1,10 @@
+import path from "node:path";
 import { runAsk } from "./ask";
 import { runEnrich } from "./enrich";
 import { runExplain } from "./explain";
 import { runExportOkf } from "./export-okf";
 import { runInspect } from "./inspect";
+import { resolveSource } from "./source";
 
 const HELP = `querypad — local-first dataset understanding
 
@@ -23,6 +25,16 @@ Usage:
   querypad export-okf [folder]     Export the semantic model as an Open Knowledge Format
                                    (Markdown+frontmatter) bundle under .datactx/okf/.
   querypad help                    Show this help
+
+External databases (inspect · ask · enrich):
+  --db <connection>                Attach a database read-only instead of scanning a folder:
+                                     postgres://user:pw@host:5432/db
+                                     mysql://user:pw@host:3306/db
+                                     sqlite:./shop.db      (or a bare ./shop.db path)
+                                   Its tables become views, so profiling and joins push down
+                                   to the source. DuckDB enforces read-only; nothing is written.
+  --schema <name>                  Restrict discovery to one schema (e.g. public)
+  --out <folder>                   Where to write .datactx/ (default: current directory)
 
 Options for ask:
   --provider <anthropic|openai>    AI provider (default: anthropic, or QUERYPAD_AI_PROVIDER)
@@ -60,6 +72,16 @@ function parseArgs(args: string[]): {
   return { positionals, flags };
 }
 
+/** Read a flag that must carry a value (`--db x`, not a bare `--db`). */
+function stringFlag(
+  flags: Record<string, string | boolean>,
+  name: string
+): string | undefined {
+  const value = flags[name];
+  if (value === true) throw new Error(`--${name} needs a value.`);
+  return typeof value === "string" ? value : undefined;
+}
+
 async function main(argv: string[]): Promise<number> {
   const [command, ...rest] = argv;
 
@@ -72,11 +94,16 @@ async function main(argv: string[]): Promise<number> {
       return 0;
     case "inspect": {
       const { positionals, flags } = parseArgs(rest);
-      const folder = positionals[0] ?? ".";
       const embedder = flags.embed === true
         ? (await import("../../embed/transformers-embedder")).createTransformersEmbedder()
         : undefined;
-      await runInspect(folder, Date.now(), { embedder });
+      const source = resolveSource({
+        folder: positionals[0],
+        db: stringFlag(flags, "db"),
+        schema: stringFlag(flags, "schema"),
+        out: stringFlag(flags, "out"),
+      });
+      await runInspect(source, Date.now(), { embedder });
       return 0;
     }
     case "ask": {
@@ -90,8 +117,13 @@ async function main(argv: string[]): Promise<number> {
       const steps = typeof flags.steps === "string" ? Number(flags.steps) : undefined;
       await runAsk({
         question,
-        folder: positionals[1] ?? ".",
-        provider: typeof flags.provider === "string" ? flags.provider : undefined,
+        source: resolveSource({
+          folder: positionals[1],
+          db: stringFlag(flags, "db"),
+          schema: stringFlag(flags, "schema"),
+          out: stringFlag(flags, "out"),
+        }),
+        provider: stringFlag(flags, "provider"),
         showSql: flags["show-sql"] === true,
         maxSteps: steps && Number.isFinite(steps) ? steps : undefined,
         verbose: flags.verbose === true,
@@ -100,28 +132,38 @@ async function main(argv: string[]): Promise<number> {
     }
     case "enrich": {
       const { positionals, flags } = parseArgs(rest);
-      const folder = positionals[0];
-      const glossaryPaths = positionals.slice(1);
-      if (!folder || glossaryPaths.length === 0) {
+      const db = stringFlag(flags, "db");
+      // Without --db the first positional is the data folder; with it, all are docs.
+      const folder = db ? undefined : positionals[0];
+      const glossaryPaths = db ? positionals : positionals.slice(1);
+      if ((!db && !folder) || glossaryPaths.length === 0) {
         console.error("Usage: querypad enrich <folder> <doc…> [--apply]\n");
+        console.error("       querypad enrich --db <connection> <doc…> [--apply]\n");
         console.error(HELP);
         return 1;
       }
       await runEnrich({
-        folder,
+        source: resolveSource({
+          folder,
+          db,
+          schema: stringFlag(flags, "schema"),
+          out: stringFlag(flags, "out"),
+        }),
         glossaryPaths,
         apply: flags.apply === true,
-        provider: typeof flags.provider === "string" ? flags.provider : undefined,
+        provider: stringFlag(flags, "provider"),
       });
       return 0;
     }
     case "explain": {
-      const { positionals } = parseArgs(rest);
-      return runExplain(positionals[0] ?? ".");
+      const { positionals, flags } = parseArgs(rest);
+      const out = stringFlag(flags, "out") ?? positionals[0] ?? ".";
+      return runExplain(path.resolve(out));
     }
     case "export-okf": {
-      const { positionals } = parseArgs(rest);
-      return runExportOkf(positionals[0] ?? ".");
+      const { positionals, flags } = parseArgs(rest);
+      const out = stringFlag(flags, "out") ?? positionals[0] ?? ".";
+      return runExportOkf(path.resolve(out));
     }
     default:
       console.error(`Unknown command: ${command}\n`);

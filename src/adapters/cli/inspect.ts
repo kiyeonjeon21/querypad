@@ -1,14 +1,13 @@
-import path from "node:path";
 import { discoverRelationships } from "../../core/discovery/relationships";
 import { buildSemanticModel } from "../../core/discovery/semantic-model";
 import { buildTermCatalog } from "../../core/discovery/term-catalog";
 import { applyVerdicts } from "../../core/discovery/verdicts";
 import { createNodeDb } from "../../engine/duckdb/connection";
-import { loadFolder } from "../../engine/duckdb/load";
 import { profileTable } from "../../engine/duckdb/profile";
 import { EMBED_DIM, EMBED_MODEL, type Embedder } from "../../embed/embedder";
 import type { DiscoveryReport } from "../../core/types/discovery";
 import { readVerdicts, writeArtifacts, writeTermEmbeddings } from "./artifacts";
+import { resolveSource, type Source } from "./source";
 
 export interface InspectOptions {
   /** When set, precompute a term-embeddings cache for hybrid resolution. */
@@ -16,31 +15,29 @@ export interface InspectOptions {
 }
 
 /**
- * `querypad inspect <folder>`: load every supported file in the folder, profile it,
- * infer relationships, and write `.datactx/` artifacts. Returns the report.
+ * `querypad inspect`: load every table the source exposes (a folder of files, or
+ * an attached external database), profile it, infer relationships, and write
+ * `.datactx/` artifacts. Returns the report.
  */
 export async function runInspect(
-  folder: string,
+  source: Source,
   now: number,
   options: InspectOptions = {}
 ): Promise<DiscoveryReport> {
-  const resolved = path.resolve(folder);
   const db = await createNodeDb();
   try {
-    console.log(`Inspecting ${resolved} ...`);
-    const { tables, skipped } = await loadFolder(resolved, db.runner);
+    console.log(`Inspecting ${source.label} ...`);
+    const { tables, skipped } = await source.load(db.runner);
 
     if (tables.length === 0) {
-      console.error(
-        "No supported data files found (.parquet, .csv, .tsv, .json, .jsonl, .ndjson)."
-      );
+      console.error(source.emptyMessage);
       const report: DiscoveryReport = {
         generatedAt: now,
         profiles: [],
         relationships: [],
         semanticModel: { generatedAt: now, entities: [] },
       };
-      await writeArtifacts(resolved, report, skipped);
+      await writeArtifacts(source.outDir, report, skipped);
       return report;
     }
 
@@ -54,7 +51,7 @@ export async function runInspect(
     const inferred = await discoverRelationships(profiles, db.runner);
     const { relationships, summary: curation } = applyVerdicts(
       inferred,
-      await readVerdicts(resolved)
+      await readVerdicts(source.outDir)
     );
     if (curation.rejected + curation.overridden + curation.added > 0) {
       console.log(
@@ -70,13 +67,13 @@ export async function runInspect(
     );
 
     const report: DiscoveryReport = { generatedAt: now, profiles, relationships, semanticModel };
-    const artifacts = await writeArtifacts(resolved, report, skipped);
+    const artifacts = await writeArtifacts(source.outDir, report, skipped);
 
     if (options.embedder) {
       console.log("Embedding terms ...");
       const catalog = buildTermCatalog(semanticModel);
       const vectors = await options.embedder(catalog.map((entry) => entry.text));
-      await writeTermEmbeddings(resolved, {
+      await writeTermEmbeddings(source.outDir, {
         model: EMBED_MODEL,
         dim: EMBED_DIM,
         entries: catalog.map((entry, i) => ({ ...entry, vector: vectors[i] })),
@@ -100,7 +97,7 @@ export async function runInspect(
       console.log(`  ${entity.name} (${entity.table})${detail}`);
     }
     if (skipped.length > 0) {
-      console.log(`Skipped:       ${skipped.length} unsupported file(s)`);
+      console.log(`Skipped:       ${skipped.length} unsupported or excluded`);
     }
     console.log("");
     console.log(`Wrote artifacts to ${artifacts.dir}`);
@@ -109,4 +106,13 @@ export async function runInspect(
   } finally {
     db.close();
   }
+}
+
+/** Convenience wrapper used by tests: inspect a plain folder. */
+export function inspectFolder(
+  folder: string,
+  now: number,
+  options: InspectOptions = {}
+): Promise<DiscoveryReport> {
+  return runInspect(resolveSource({ folder }), now, options);
 }

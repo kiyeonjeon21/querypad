@@ -3,6 +3,21 @@
 QueryPad is a local-first CLI. Version numbers mark GitHub release milestones
 and public product updates.
 
+## Unreleased
+
+### External databases
+
+- New `--db` flag on `inspect`, `ask`, and `enrich`: attach a live **Postgres**,
+  **MySQL**, or **SQLite** database instead of scanning a folder
+  (`postgres://…`, `mysql://…`, `sqlite:./shop.db`, or a bare `./shop.db` path)
+- Source tables are exposed as **views**, so nothing is copied into memory and
+  profiling, value-overlap, and join queries push down to the source engine
+- The attachment is `READ_ONLY` and DuckDB enforces it: neither QueryPad nor the
+  agent can write to your database
+- `--schema <name>` restricts discovery to one schema; `--out <folder>` chooses
+  where `.datactx/` is written (`explain` and `export-okf` accept `--out` too)
+- Passwords are stripped from every log line, error message, and artifact
+
 ## v0.7 — Terminal-First
 
 ### BREAKING: web app removed

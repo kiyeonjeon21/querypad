@@ -81,6 +81,26 @@ entities:
     belongs_to: [User]
 ```
 
+## External databases: no JDBC, no DBeaver
+
+Point the same engine at a live database instead of a folder:
+
+```bash
+querypad inspect --db postgres://user:pw@host:5432/shop --schema public --out ./ctx
+querypad inspect --db mysql://root@127.0.0.1:3306/shop
+querypad inspect --db sqlite:./shop.db          # or just ./shop.db
+querypad ask "revenue by plan" --db postgres://user@host/shop --out ./ctx
+```
+
+DuckDB's `postgres`/`mysql`/`sqlite` extensions attach the database and QueryPad
+exposes each table as a **view**, so nothing is copied into memory and profiling,
+value-overlap, and join queries push down to the source engine.
+The attachment is `READ_ONLY` and **DuckDB enforces it**, so neither QueryPad nor the agent can write to your database.
+Passwords are stripped from every log line and artifact.
+
+`--out` chooses where `.datactx/` goes (default: the current directory); `explain`
+and `export-okf` accept the same flag.
+
 ## `ask`: the AI analyst
 
 ```bash
@@ -199,7 +219,7 @@ See [ROADMAP.md](ROADMAP.md) for the full plan.
 
 ```text
 src/core/      pure logic, zero npm deps (discovery · agent · sql · format · types)
-src/engine/    QueryRunner implementations (duckdb: native @duckdb/node-api)
+src/engine/    QueryRunner implementations (duckdb: files; attach: external DBs)
 src/ai/        provider-agnostic LLM completion (Anthropic / OpenAI, BYOK)
 src/embed/     embedding interface + optional Transformers.js backend
 src/adapters/  thin, replaceable surfaces (cli today; mcp next)

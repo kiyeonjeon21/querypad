@@ -101,6 +101,42 @@ test("e2e: explain without artifacts fails with guidance", async () => {
   assert.match(stdout, /Run `querypad inspect/);
 });
 
+test("e2e: --db attaches a SQLite database and writes artifacts to --out", async () => {
+  const dbDir = await mkdtemp(path.join(tmpdir(), "querypad-e2e-db-"));
+  const dbFile = path.join(dbDir, "shop.db");
+  const out = await mkdtemp(path.join(tmpdir(), "querypad-e2e-dbout-"));
+
+  // Build the fixture through the CLI's own engine (writable attach, then detach).
+  const { createNodeDb } = await import("../src/engine/duckdb/connection");
+  const seed = await createNodeDb();
+  await seed.runner(`ATTACH '${dbFile}' AS w (TYPE SQLITE)`);
+  await seed.runner("CREATE TABLE w.users (id INTEGER, plan VARCHAR)");
+  await seed.runner("CREATE TABLE w.orders (id INTEGER, user_id INTEGER, amount DOUBLE)");
+  await seed.runner("INSERT INTO w.users VALUES (1,'paid'),(2,'free')");
+  await seed.runner("INSERT INTO w.orders VALUES (1,1,10.0),(2,2,4.5)");
+  await seed.runner("DETACH w");
+  seed.close();
+
+  const { stdout, code } = await cli(["inspect", "--db", `sqlite:${dbFile}`, "--out", out]);
+  assert.equal(code, 0);
+  assert.match(stdout, /orders\.user_id ↳ users\.id/);
+  // The connection string is echoed, so make sure artifacts landed under --out.
+  const schema = JSON.parse(await readFile(path.join(out, ".datactx", "schema.json"), "utf8"));
+  assert.equal(schema.tables.length, 2);
+
+  // explain reads the same artifacts via --out.
+  const explain = await cli(["explain", "--out", out]);
+  assert.equal(explain.code, 0);
+  assert.match(explain.stdout, /orders\.user_id ↳ users\.id/);
+});
+
+test("e2e: a bad --db value fails with guidance and no credential leak", async () => {
+  const { code, stderr } = await cli(["inspect", "--db", "redis://alice:hunter2@host/0"]);
+  assert.notEqual(code, 0);
+  assert.match(stderr, /Unrecognized --db/);
+  assert.ok(!stderr.includes("hunter2"), "password must not appear in the error");
+});
+
 test("e2e: export-okf emits an interlinked OKF bundle", async () => {
   const dir = await freshDataDir();
   await cli(["inspect", dir]);

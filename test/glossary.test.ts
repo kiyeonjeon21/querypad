@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { runEnrich, type GlossaryAi } from "../src/adapters/cli/enrich";
 import { loadDoc } from "../src/adapters/cli/loaders";
+import { resolveSource } from "../src/adapters/cli/source";
 import { mergeGlossary, parseGlossary } from "../src/core/discovery/glossary";
 import type { SemanticModel } from "../src/core/types/discovery";
 
@@ -112,7 +113,7 @@ test("runEnrich builds the model, applies extracted terms, and writes glossary.j
   };
 
   const result = await runEnrich({
-    folder: "fixtures/data",
+    source: resolveSource({ folder: "fixtures/data" }),
     glossaryPaths: [doc],
     apply: true,
     ai: stub,

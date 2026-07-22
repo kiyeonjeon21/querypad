@@ -14,8 +14,8 @@ npm-debug.log*
 # env files (can opt-in for committing if needed)
 .env*
 
-# querypad CLI inspection artifacts
-.querypad/
+# CLI inspection artifacts
+.datactx/
 
 # mcp
 .mcp.json

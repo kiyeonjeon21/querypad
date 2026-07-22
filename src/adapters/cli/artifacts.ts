@@ -4,14 +4,16 @@ import type { AppliedChange, GlossaryEntry } from "../../core/discovery/glossary
 import type { OkfFile } from "../../core/discovery/okf-export";
 import { renderSemanticYaml } from "../../core/discovery/semantic-model";
 import type { TermEntry } from "../../core/discovery/term-catalog";
+import type { VerdictsDoc } from "../../core/discovery/verdicts";
 import type { TableProfile } from "../../core/types";
 import type { DiscoveryReport, Relationship, SemanticModel } from "../../core/types/discovery";
 
-const ARTIFACT_DIR = ".querypad";
+export const ARTIFACT_DIR = ".datactx";
 const TERM_EMBEDDINGS_FILE = "term-embeddings.json";
 const GLOSSARY_FILE = "glossary.json";
 const SEMANTIC_MODEL_FILE = "semantic-model.yaml";
 const SEMANTIC_MODEL_JSON = "semantic-model.json";
+const VERDICTS_FILE = "verdicts.json";
 const OKF_DIR = "okf";
 
 export interface CachedArtifacts {
@@ -27,7 +29,7 @@ async function readJson<T>(filePath: string): Promise<T | null> {
   }
 }
 
-/** Read previously written `.querypad/` artifacts for context reuse (null when absent). */
+/** Read previously written `.datactx/` artifacts for context reuse (null when absent). */
 export async function readArtifacts(folder: string): Promise<CachedArtifacts> {
   const dir = path.resolve(folder, ARTIFACT_DIR);
   const relDoc = await readJson<{ relationships: Relationship[] }>(
@@ -38,6 +40,15 @@ export async function readArtifacts(folder: string): Promise<CachedArtifacts> {
     relationships: relDoc?.relationships ?? null,
     profiles: schemaDoc?.tables ?? null,
   };
+}
+
+/**
+ * Read the user's relationship verdicts + overrides (null when absent).
+ * `verdicts.json` is hand- or agent-editable; inspect/ask/explain honor it.
+ */
+export async function readVerdicts(folder: string): Promise<VerdictsDoc | null> {
+  const dir = path.resolve(folder, ARTIFACT_DIR);
+  return readJson<VerdictsDoc>(path.join(dir, VERDICTS_FILE));
 }
 
 /** A precomputed term index: the catalog with a vector per entry. */
@@ -90,7 +101,7 @@ export async function readSemanticModel(folder: string): Promise<SemanticModel |
   return readJson<SemanticModel>(path.join(dir, SEMANTIC_MODEL_JSON));
 }
 
-/** Write an OKF bundle (Markdown+frontmatter files) under `.querypad/okf/`. */
+/** Write an OKF bundle (Markdown+frontmatter files) under `.datactx/okf/`. */
 export async function writeOkfBundle(folder: string, files: OkfFile[]): Promise<string> {
   const dir = path.resolve(folder, ARTIFACT_DIR, OKF_DIR);
   await mkdir(dir, { recursive: true });
@@ -206,7 +217,8 @@ export function buildSummary(report: DiscoveryReport, skipped: string[]): string
     "## Next steps",
     "",
     "- Review inferred relationships and entities, and adjust as needed.",
-    "- Feed `.querypad/schema.json`, `relationships.json`, and `semantic-model.yaml` to an AI agent to reason about the dataset.",
+    "- Reject or edit inferred joins in `.datactx/verdicts.json`; inspect/ask/explain honor it.",
+    "- Feed `.datactx/schema.json`, `relationships.json`, and `semantic-model.yaml` to an AI agent to reason about the dataset.",
     ""
   );
 

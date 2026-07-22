@@ -86,14 +86,7 @@ export interface SemanticModel {
 /** A user's verification verdict on an inferred relationship. */
 export type RelationshipVerdict = "accepted" | "rejected";
 
-/** Browser-side discovery state for the relationship verification UI. */
-export interface RelationshipDiscoveryState {
-  status: "idle" | "loading" | "ready" | "error";
-  relationships: Relationship[];
-  error: string | null;
-}
-
-/** Full output of a folder inspection, serialized to .querypad/ artifacts. */
+/** Full output of a folder inspection, serialized to .datactx/ artifacts. */
 export interface DiscoveryReport {
   generatedAt: number;
   profiles: TableProfile[];

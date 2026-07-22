@@ -11,13 +11,14 @@ import { discoverRelationships } from "../../core/discovery/relationships";
 import { buildSemanticModel } from "../../core/discovery/semantic-model";
 import { isReadOnlyQuery, stripSqlFences } from "../../core/discovery/sql-safety";
 import { resolveTerms } from "../../core/discovery/term-search";
+import { applyVerdicts } from "../../core/discovery/verdicts";
 import { createTransformersEmbedder } from "../../embed/transformers-embedder";
 import { createNodeDb, type QueryResultRows } from "../../engine/duckdb/connection";
 import { loadFolder } from "../../engine/duckdb/load";
 import { profileTable } from "../../engine/duckdb/profile";
 import type { Relationship } from "../../core/types/discovery";
 import { resolveAiCredentials } from "./ai-env";
-import { readArtifacts, readTermEmbeddings } from "./artifacts";
+import { readArtifacts, readTermEmbeddings, readVerdicts } from "./artifacts";
 import { renderTable } from "./render";
 
 const ANALYST_SYSTEM_PROMPT = `You are a data analyst. Given a question, the SQL that was run, and a sample of the result rows, state the answer as a concise 1-3 sentence finding. No preamble, do not restate the SQL, do not apologize.`;
@@ -128,18 +129,20 @@ export async function runAsk(options: RunAskOptions): Promise<AskResult> {
       );
     }
 
-    // Prefer cached .querypad/ artifacts; otherwise profile + discover on the fly.
+    // Prefer cached .datactx/ artifacts; otherwise profile + discover on the fly.
     const cached = await readArtifacts(options.folder);
     const now = Date.now();
     let profiles = cached.profiles ?? undefined;
-    let relationships: Relationship[];
+    let inferred: Relationship[];
     if (cached.relationships) {
-      relationships = cached.relationships;
+      inferred = cached.relationships;
     } else {
       profiles =
         profiles ?? (await Promise.all(tables.map((table) => profileTable(table, db.runner, now))));
-      relationships = await discoverRelationships(profiles, db.runner);
+      inferred = await discoverRelationships(profiles, db.runner);
     }
+    // Honor user curation (idempotent when the cache was already curated).
+    const { relationships } = applyVerdicts(inferred, await readVerdicts(options.folder));
 
     // Profiles enrich the model with dimensions/measures; undefined → entities only.
     const semanticModel = buildSemanticModel(

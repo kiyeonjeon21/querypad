@@ -3,7 +3,7 @@ import { readSemanticModel, writeOkfBundle } from "./artifacts";
 
 /**
  * `querypad export-okf <folder>`: write the semantic model as an OKF (Open Knowledge Format)
- * bundle under `.querypad/okf/`. Pure consumer of `.querypad/semantic-model.json`; run
+ * bundle under `.datactx/okf/`. Pure consumer of `.datactx/semantic-model.json`; run
  * `inspect` (and optionally `enrich`) first.
  */
 export async function runExportOkf(folder: string): Promise<number> {

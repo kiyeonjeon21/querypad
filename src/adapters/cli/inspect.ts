@@ -2,12 +2,13 @@ import path from "node:path";
 import { discoverRelationships } from "../../core/discovery/relationships";
 import { buildSemanticModel } from "../../core/discovery/semantic-model";
 import { buildTermCatalog } from "../../core/discovery/term-catalog";
+import { applyVerdicts } from "../../core/discovery/verdicts";
 import { createNodeDb } from "../../engine/duckdb/connection";
 import { loadFolder } from "../../engine/duckdb/load";
 import { profileTable } from "../../engine/duckdb/profile";
 import { EMBED_DIM, EMBED_MODEL, type Embedder } from "../../embed/embedder";
 import type { DiscoveryReport } from "../../core/types/discovery";
-import { writeArtifacts, writeTermEmbeddings } from "./artifacts";
+import { readVerdicts, writeArtifacts, writeTermEmbeddings } from "./artifacts";
 
 export interface InspectOptions {
   /** When set, precompute a term-embeddings cache for hybrid resolution. */
@@ -16,7 +17,7 @@ export interface InspectOptions {
 
 /**
  * `querypad inspect <folder>`: load every supported file in the folder, profile it,
- * infer relationships, and write `.querypad/` artifacts. Returns the report.
+ * infer relationships, and write `.datactx/` artifacts. Returns the report.
  */
 export async function runInspect(
   folder: string,
@@ -50,7 +51,17 @@ export async function runInspect(
     }
 
     console.log("Discovering relationships ...");
-    const relationships = await discoverRelationships(profiles, db.runner);
+    const inferred = await discoverRelationships(profiles, db.runner);
+    const { relationships, summary: curation } = applyVerdicts(
+      inferred,
+      await readVerdicts(resolved)
+    );
+    if (curation.rejected + curation.overridden + curation.added > 0) {
+      console.log(
+        `Applied verdicts.json: ${curation.rejected} rejected, ` +
+          `${curation.overridden} overridden, ${curation.added} added.`
+      );
+    }
     const semanticModel = buildSemanticModel(
       profiles.map((profile) => profile.tableName),
       relationships,

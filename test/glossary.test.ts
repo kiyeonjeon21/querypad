@@ -128,7 +128,7 @@ test("runEnrich builds the model, applies extracted terms, and writes glossary.j
   // glossary.json was written (readTermEmbeddings shares the dir; just check the file exists).
   const { readFile } = await import("node:fs/promises");
   const glossary = JSON.parse(
-    await readFile("fixtures/data/.querypad/glossary.json", "utf8")
+    await readFile("fixtures/data/.datactx/glossary.json", "utf8")
   ) as { entries: unknown[] };
   assert.ok(Array.isArray(glossary.entries) && glossary.entries.length === 2);
 });

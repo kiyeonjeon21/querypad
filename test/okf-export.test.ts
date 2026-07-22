@@ -65,9 +65,9 @@ test("runExportOkf writes the bundle from the persisted model", async () => {
   const code = await runExportOkf(dir);
   assert.equal(code, 0);
 
-  const index = await readFile(path.join(dir, ".querypad", "okf", "index.md"), "utf8");
+  const index = await readFile(path.join(dir, ".datactx", "okf", "index.md"), "utf8");
   assert.match(index, /## Entities/);
-  const users = await readFile(path.join(dir, ".querypad", "okf", "users.md"), "utf8");
+  const users = await readFile(path.join(dir, ".datactx", "okf", "users.md"), "utf8");
   assert.match(users, /# User/);
 });
 

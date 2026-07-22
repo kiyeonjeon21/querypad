@@ -9,7 +9,7 @@ const HELP = `querypad — local-first dataset understanding
 
 Usage:
   querypad inspect [folder]        Profile a folder of data files and infer relationships
-                                   (writes .querypad/ artifacts). Defaults to the current directory.
+                                   (writes .datactx/ artifacts). Defaults to the current directory.
                                    --embed  precompute a term-embeddings cache (local model)
                                             so ask can resolve synonyms/terms semantically
   querypad ask "<question>" [folder]
@@ -20,9 +20,9 @@ Usage:
                                    and map terms → real columns, adding descriptions/synonyms
                                    to the semantic model. Add --apply to write semantic-model.yaml.
   querypad explain [folder]        Justify each inferred relationship from its signals,
-                                   with caveats to verify (reads .querypad/; run inspect first).
+                                   with caveats to verify (reads .datactx/; run inspect first).
   querypad export-okf [folder]     Export the semantic model as an Open Knowledge Format
-                                   (Markdown+frontmatter) bundle under .querypad/okf/.
+                                   (Markdown+frontmatter) bundle under .datactx/okf/.
   querypad help                    Show this help
 
 Options for ask:

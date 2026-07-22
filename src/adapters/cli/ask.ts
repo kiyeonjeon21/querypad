@@ -1,23 +1,18 @@
 import { complete, completeWithTools } from "../../ai/complete";
 import { SQL_SYSTEM_PROMPT, buildSqlInput } from "../../ai/generate-sql";
-import { buildAskContext } from "../../core/agent/ask-context";
 import {
   runAgentQuery,
   type AgentComplete,
   type AgentQueryResult,
   type AgentStep,
 } from "../../core/agent/loop";
-import { discoverRelationships } from "../../core/discovery/relationships";
-import { buildSemanticModel } from "../../core/discovery/semantic-model";
 import { isReadOnlyQuery, stripSqlFences } from "../../core/discovery/sql-safety";
 import { resolveTerms } from "../../core/discovery/term-search";
-import { applyVerdicts } from "../../core/discovery/verdicts";
 import { createTransformersEmbedder } from "../../embed/transformers-embedder";
 import { createNodeDb, type QueryResultRows } from "../../engine/duckdb/connection";
-import { profileTable } from "../../engine/duckdb/profile";
-import type { Relationship } from "../../core/types/discovery";
 import { resolveAiCredentials } from "./ai-env";
-import { readArtifacts, readTermEmbeddings, readVerdicts } from "./artifacts";
+import { readTermEmbeddings } from "./artifacts";
+import { prepareDataset } from "../dataset";
 import { renderTable, terminalRenderOptions } from "./render";
 import type { Source } from "./source";
 
@@ -121,34 +116,12 @@ export async function runAsk(options: RunAskOptions): Promise<AskResult> {
 
   const db = await createNodeDb();
   try {
-    const { tables } = await options.source.load(db.runner);
-    if (tables.length === 0) {
-      throw new Error(options.source.emptyMessage);
-    }
-
-    // Prefer cached .datactx/ artifacts; otherwise profile + discover on the fly.
-    const cached = await readArtifacts(options.source.outDir);
-    const now = Date.now();
-    let profiles = cached.profiles ?? undefined;
-    let inferred: Relationship[];
-    if (cached.relationships) {
-      inferred = cached.relationships;
-    } else {
-      profiles =
-        profiles ?? (await Promise.all(tables.map((table) => profileTable(table, db.runner, now))));
-      inferred = await discoverRelationships(profiles, db.runner);
-    }
-    // Honor user curation (idempotent when the cache was already curated).
-    const { relationships } = applyVerdicts(inferred, await readVerdicts(options.source.outDir));
-
-    // Profiles enrich the model with dimensions/measures; undefined → entities only.
-    const semanticModel = buildSemanticModel(
-      tables.map((table) => table.name),
+    const {
+      tables,
       relationships,
-      now,
-      profiles
-    );
-    const context = buildAskContext({ tables, relationships, semanticModel });
+      model: semanticModel,
+      context,
+    } = await prepareDataset(options.source, db.runner);
 
     // --show-sql: generate a single query and print it without executing.
     if (options.showSql) {

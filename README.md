@@ -166,6 +166,46 @@ claude mcp add querypad -- querypad mcp /path/to/data
 
 The agent never sees a write path: `run_sql` is read-only-gated, and with `--db` the attachment is `READ_ONLY` at the DuckDB level too.
 
+## `eval`: know whether a change made it better
+
+```bash
+npm run eval:engine    # deterministic, no API key, runs in CI
+npm run eval:agent     # needs ANTHROPIC_API_KEY, costs tokens
+```
+
+Both suites score against `evals/dataset/` - a small e-commerce dataset built so a
+careless answer is *wrong*, not just differently phrased:
+
+| Trap | What it catches |
+|---|---|
+| **Fan-out** | `customers` has_many both `orders` and `support_tickets`; joining through tickets inflates revenue from 9,050 to 12,650 |
+| **Multi-hop** | `order_items → orders → customers` and `order_items → products → categories` |
+| **Ambiguous join** | `billing_region_id` and `shipping_region_id` both reference `regions`, and give different answers |
+| **Distinct vs count** | 9 customers placed 12 orders |
+| **Null join** | one order has no line items; INNER vs LEFT changes the result |
+
+**Engine suite** asserts what the deterministic layers derive: inferred relationships and
+their confidence, entity/dimension/measure derivation, metric compilation *including the
+refusals that prevent fan-out*, and term resolution.
+
+**Agent suite** puts each question through the real agent loop, then compares its rows
+against ground truth produced by the case's `expectedSql` (never shown to the agent).
+Grading is **value-based**: column names and order are ignored, so `SELECT SUM(x) AS total`
+and `AS revenue` both count as correct, while a fan-out gets caught by the number.
+Cases can also assert behavior - which tools were used, and a step budget.
+
+```text
+case                     outcome  steps  detail
+-----------------------  -------  -----  --------------------------------
+simple-count             pass         2
+revenue-by-plan          fail         5  row 1: got [12650], expected [9050]
+
+agent: 11/12 passed (91.7%), 1 failed
+```
+
+Reports land in `.datactx/evals/` (gitignored) so runs can be diffed.
+`--repeat N` runs each case N times to surface non-determinism; `--cases a,b` narrows the run.
+
 ## `explain`: justify every join
 
 ```bash
@@ -247,6 +287,7 @@ src/core/      pure logic, zero npm deps (discovery · agent · sql · format ·
 src/engine/    QueryRunner implementations (duckdb: files; attach: external DBs)
 src/ai/        provider-agnostic LLM completion (Anthropic / OpenAI, BYOK)
 src/embed/     embedding interface + optional Transformers.js backend
+src/evals/     eval harness: grading, engine suite, agent suite, reporting
 src/adapters/  thin, replaceable surfaces (cli, mcp)
 ```
 
@@ -259,6 +300,7 @@ are injected - so future surfaces (MCP server, terminal host) plug in under
 ```bash
 npm run querypad -- inspect ./fixtures/data   # run from source (tsx)
 npm run test:cli                              # unit + spawn-based e2e tests
+npm run eval:engine                           # score the deterministic engine
 npm run check                                 # version metadata + lint + typecheck + build
 ```
 

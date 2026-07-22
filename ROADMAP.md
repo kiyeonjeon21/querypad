@@ -41,6 +41,7 @@ Layer 4  AI Analyst          →  question → semantic model → SQL → execut
 | AI Verification | `.datactx/verdicts.json`: reject/override inferred joins; honored by inspect/ask/explain | ✅ Built (CLI) |
 | External databases | `--db` attaches Postgres/MySQL/SQLite read-only; tables become pushdown views | ✅ Built |
 | MCP server | `querypad mcp` exposes the read-only toolkit over stdio to Claude Code / Cursor | ✅ Built |
+| Eval harness | `querypad eval engine\|agent` scores both layers against a committed trap dataset | ✅ Built |
 
 ## Built today
 
@@ -199,7 +200,13 @@ competitor is cloud/warehouse-native. Build one step at a time:
    a database interchangeable to `inspect`, `ask`, and `enrich`; `--schema` scopes the
    discovery and `--out` places `.datactx/`. Credentials are redacted from every log line
    and artifact.
-4. Verification step before answering + eval harness (question → expected-result pairs).
+4. **Eval harness** — ✅ Built. Two suites over a committed trap dataset (`evals/`): an engine
+   suite (deterministic, no key, gates CI) scoring relationship inference, model derivation,
+   metric compilation incl. fan-out refusals, and term resolution; and an agent suite that runs
+   each question through the real loop and compares rows against ground truth from the case's
+   `expectedSql`. Grading is value-based, so any correct SQL formulation passes and a fan-out
+   is caught by the number. **Verification step before answering — still open**, and now
+   measurable: it must move the agent score to justify itself.
 5. **MCP server** — ✅ Built. `querypad mcp` serves the read-only toolkit over stdio. The
    tools are not a reimplementation: `createDataToolkit` (`src/core/agent/toolkit.ts`) is
    the single definition that both the internal `ask` loop and the MCP server consume, so

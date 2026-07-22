@@ -45,3 +45,7 @@ jobs:
 
       - name: Run CLI tests (unit + e2e)
         run: npm run test:cli
+
+      # Deterministic engine evals only — the agent suite costs tokens and is run manually.
+      - name: Run engine evals
+        run: npm run eval:engine

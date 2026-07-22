@@ -32,6 +32,17 @@ core/engine are a type error, not a code-review catch.
 - `.datactx/verdicts.json` is the user's curation (reject/override inferred joins);
   `inspect`, `ask`, and `explain` must honor it and re-runs must preserve it.
 
+## Evals
+
+- `evals/dataset/` is a committed trap dataset; `evals/cases/*.json` are the graded cases.
+  Both are inputs - never regenerate them to make a run pass.
+- `npm run eval:engine` is deterministic and gates CI. `npm run eval:agent` costs tokens and is manual.
+- A failing case is either a real defect or a wrong case. **Do not tune the engine to turn a case green** -
+  fix the defect or fix the case, and say which.
+- Agent grading is value-based (`src/evals/grade.ts`): column names and row order are ignored unless
+  the case sets `orderSensitive`. Add behavioral expectations (`mustUseTool`, `maxSteps`) when the
+  *route* to the answer matters, not just the number.
+
 ## Release and verification
 
 - Keep `package.json`, `package-lock.json`, and the latest `CHANGELOG.md` release version in sync.

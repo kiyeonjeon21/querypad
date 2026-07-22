@@ -46,7 +46,9 @@
     "check:version": "node scripts/check-version.mjs",
     "check": "npm run check:version && npm run lint && npm run typecheck && npm run build",
     "version": "npm run check:version",
-    "test:cli": "node --import tsx --test test/*.test.ts"
+    "test:cli": "node --import tsx --test test/*.test.ts",
+    "eval:engine": "tsx src/adapters/cli/index.ts eval engine",
+    "eval:agent": "tsx src/adapters/cli/index.ts eval agent"
   },
   "dependencies": {
     "@duckdb/node-api": "^1.5.3-r.3"

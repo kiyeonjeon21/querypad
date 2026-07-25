@@ -421,11 +421,24 @@ see the measure-grain defect in step 6.2. Build one step at a time:
          on a real dataset; write down what a plain terminal cannot do (results
          scroll away, no graph, no curation UI). That list is the app's feature
          spec, and it needs a human at the keyboard, not a score.
-   2. **Embedding spike** — minimal Swift app with a GhosttyKit pane
-      (libghostty-spm) running `claude`; pin and vendor the framework, and keep
-      the terminal component behind a protocol so SwiftTerm stays a fallback.
-      Study cmux for architecture only: it is GPL-3.0, so no code may be copied
-      (QueryPad is MIT).
+   2. **Embedding spike** - ✅ Done (2026-07-26, repo `~/dev/personal/projects/datactx-app`,
+      brand-independent name pending step 9). What the spike corrected before writing code:
+      there is **no official Swift package for the full GhosttyKit render path** - only
+      third-party binary redistributions of an API whose own header says it is unstable. The
+      official embedding path today is **libghostty-vt (the state machine) plus your own
+      renderer**, demonstrated by `ghostty-org/ghostling` (official, MIT, active) - and
+      ghostty's build emits a ready-made `ghostty-vt.xcframework` with a modulemap, so no
+      third-party repackaging is needed at all.
+      **What was proven on this machine**: ghostling builds from official source (Zig pinned at
+      0.15.x, its stated requirement) and runs; and the spike app - one window, a terminal pane
+      running a login shell - builds and runs with `ghostty-vt probe: simd=true roundTrip=true`,
+      i.e. Swift <-> Zig interop with the official artifact works (create a terminal, feed VT
+      bytes through the parser, free).
+      **The architecture that follows**: the pane is SwiftTerm (mature, pure Swift) behind a
+      `TerminalPane` protocol - nothing else may import a terminal library - and libghostty-vt
+      is linked and probed but not yet rendering. When the full embedding API stabilizes, the
+      swap is an implementation project, not a feasibility question. cmux was not studied and
+      did not need to be: ghostling is official and MIT, so the GPL question never arises.
    3. **Data channel** — MCP over the app-owned local socket plus the first
       native panel: a result table updating live as the agent queries.
    4. **Product skeleton** — per-dataset workspaces, session restore,

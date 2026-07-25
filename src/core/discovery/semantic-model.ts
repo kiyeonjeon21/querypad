@@ -6,7 +6,7 @@ import type {
   SemanticMeasure,
   SemanticModel,
 } from "../types/discovery";
-import { singularize, splitTokens } from "./signals";
+import { isIdLike, singularize, splitTokens } from "./signals";
 
 /**
  * Roll inferred relationships into named business entities. Pure — tables +
@@ -79,16 +79,6 @@ function keyColumns(table: string, relationships: Relationship[]): Set<string> {
     if (rel.to.table === table) keys.add(rel.to.column);
   }
   return keys;
-}
-
-/**
- * True for id-named columns (surrogate keys). We exclude these from measures/dimensions
- * by name rather than by uniqueness — a unique, non-null column like `amount` is a real
- * measure, not a key, so summing it is meaningful.
- */
-function isIdLike(name: string, table: string): boolean {
-  const lower = name.toLowerCase();
-  return lower === "id" || lower.endsWith("_id") || lower === `${singularize(table)}_id`;
 }
 
 /** Derive a dimension candidate from a non-key column, or null if it isn't one. */

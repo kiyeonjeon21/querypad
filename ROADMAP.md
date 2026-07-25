@@ -302,15 +302,24 @@ see the measure-grain defect in step 6.2. Build one step at a time:
    With the web app retired this is the interactive surface: the coding agent is the UI.
 6. **Engine defects surfaced by the hard dataset** - open, and worth fixing before more
    semantic-layer work.
-   1. **Numeric value overlap creates phantom foreign keys.** `isKeyCandidate`
+   1. **Numeric value overlap creates phantom foreign keys** - ✅ Fixed (2026-07-26). `isKeyCandidate`
       (`src/core/discovery/relationships.ts:38`) accepts any column that is unique and non-null
       in its own table, so a small lookup table's `list_amt` is a valid FK *target*. Every money
       column whose values coincide with those prices then gets an edge (measured: 81%, 68%, 54%
       on the hard fixture before it was made realistic). The damage is not just a wrong edge in
       the graph: `keyColumns` (`semantic-model.ts:75`) excludes both endpoints of every edge from
       dimensions **and** measures, so the table's real money measure disappears without a word.
-      Candidate fix: require an FK target to look like a key (id-like name, or referenced by a
-      name-similar column), or refuse targets that are themselves measures.
+      **The fix**: a non-id target is only credible when the foreign column names it outright
+      (`nameSimilarity >= STRONG_NAME_SIMILARITY`), which is what a real natural key looks like -
+      `sku -> sku`, `region_cd -> region_cd`. Uniqueness alone no longer qualifies a column as a
+      join target. `isIdLike` moved to `signals.ts` and is now the single definition shared by
+      relationship inference and model derivation, which previously disagreed about it: the
+      semantic model already knew "a unique, non-null column like `amount` is a real measure, not
+      a key", and inference did not.
+      Verified on an isolated fixture (a 4-row price list whose prices coincide with a sales
+      table's line amounts): the phantom edge disappears, the legitimate `sku` join survives at
+      100%, and both `sum_line_amt` and `sum_list_amt` come back. Both engine suites are
+      unchanged (18/18 and 25/25), so no real edge was lost.
    2. **Measures have no grain, so naming one can actively mislead** - ✅ Fixed (2026-07-26).
       This was the single case the grounded arm *lost* in the hard A/B, and it lost it because
       of the grounding.

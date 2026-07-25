@@ -82,6 +82,16 @@ export function nameSimilarity(
 }
 
 /** Are two column kinds joinable at all? */
+/**
+ * True for id-named columns (surrogate keys). Deliberately name-based, not
+ * uniqueness-based: a unique, non-null column like `amount` is a real measure, not a
+ * key, so summing it is meaningful and joining on it is not.
+ */
+export function isIdLike(name: string, table: string): boolean {
+  const lower = name.toLowerCase();
+  return lower === "id" || lower.endsWith("_id") || lower === `${singularize(table)}_id`;
+}
+
 export function isTypeCompatible(a: ProfileColumnKind, b: ProfileColumnKind): boolean {
   if (a === b) return true;
   // numbers stored as text vs numeric still routinely join after casting

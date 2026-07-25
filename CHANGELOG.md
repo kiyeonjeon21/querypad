@@ -5,6 +5,37 @@ and public product updates.
 
 ## Unreleased
 
+### Grounded vs raw-SQL A/B (the moat claim, measured)
+
+- New `querypad eval agent --ab`: runs two arms over the same cases, **interleaved case by case**
+  so API drift cannot masquerade as a result. `grounded` is the zero-override arm (the shipped path,
+  asserted identical to a plain run); `raw-sql` gets `run_sql` alone and no grounding context, and is
+  not crippled - SHOW/DESCRIBE are read-only, so it discovers the schema itself the way a shell agent
+  would. Also `--arm <grounded|raw-sql>` and `--steps <n>`
+- **Result: the accuracy claim is not supported yet.** 12 cases, repeat 3, verify on, maxSteps 12:
+  grounded 29/36 runs (80.6%, 8/12 cases) vs raw-sql 28/36 (77.8%, 9/12 cases). +2.8 points is far
+  inside the noise floor at this sample size, and the arms disagree on direction depending on the
+  metric. 8 of 12 cases passed 3/3 in *both* arms, including the fan-out, multi-hop, distinct and
+  null-join traps
+- **Result: efficiency is a large, consistent win.** 1.7 vs 4.3 mean tool steps, lower on every
+  single case - grounding removes roughly 60% of the exploration
+- Validity checks passed (they are printed before the score, and a dirty one means rerun rather than
+  interpret): neither arm hit the turn budget, and both `baseline` control cases passed 3/3 in both
+  arms
+- Grading integrity: accuracy-only for both arms, because applying the case file's behavioral
+  assertions to the grounded arm alone would have given the arm under test a strictly harder rubric.
+  Run-level pass rates replace the strict all-runs-must-pass rule as the A/B headline, since the
+  latter estimates p^N rather than p
+- `AgentQueryResult.budgetExhausted` records when a turn budget forced the answer, so "failed for
+  lack of grounding" and "ran out of turns" are no longer indistinguishable
+- Reports now carry a `config` block (arm, repeat, verify, behavioral, maxSteps, tools, and the exact
+  system prompt) so a number cannot be quoted without its setup, and a reader can audit that the
+  control was not sandbagged. Per-arm report filenames keep the two artifacts apart
+- `createDataToolkit` takes an `only` tool allowlist, throwing at construction on an unknown name so
+  a silently tool-less agent can never look like a measurement
+- Dropped the inert `mustNotUseTool: []` from the safety case: an empty array iterates zero times, so
+  it read as an assertion while enforcing nothing
+
 ### Verification before answering
 
 - `ask` now runs a self-critique pass before answering: when the agent goes to finalize, one

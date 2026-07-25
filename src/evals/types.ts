@@ -64,10 +64,41 @@ export interface CaseResult {
   /** Failed SQL attempts the agent recovered from. */
   selfCorrections?: number;
   toolsUsed?: string[];
+  /**
+   * How many of the `--repeat` runs passed. The case `outcome` is strict (it
+   * passes only when every run passes), which is right for gating but a coarse
+   * estimator for an A/B delta — these give the finer-grained rate.
+   */
+  runsPassed?: number;
+  runsTotal?: number;
+  /** Which tool produced the rows that were graded (see the note in run-agent). */
+  lastTool?: string;
+  /** True when any run was cut off by the turn budget rather than finishing. */
+  budgetExhausted?: boolean;
+}
+
+/**
+ * The configuration a report was produced under. Stored so a number can never be
+ * quoted without the setup that produced it — two reports in `.datactx/evals/`
+ * with different `verify` settings were previously indistinguishable.
+ */
+export interface SuiteConfig {
+  arm: string;
+  repeat: number;
+  verify: boolean;
+  behavioral: boolean;
+  maxSteps: number;
+  tools: string[];
+  /** The exact preamble the model saw, so a reader can audit the control arm. */
+  systemPrompt: string;
 }
 
 export interface SuiteReport {
   suite: "engine" | "agent";
+  /** Agent suite only: which configuration was measured (see src/evals/arms.ts). */
+  arm?: string;
+  /** Agent suite only: the full setup this score was produced under. */
+  config?: SuiteConfig;
   generatedAt: number;
   total: number;
   passed: number;

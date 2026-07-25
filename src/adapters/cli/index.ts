@@ -30,8 +30,10 @@ Usage:
                                    Claude Code / Cursor. Accepts --db/--schema/--out too.
   querypad eval <engine|agent>     Score the engine (deterministic, no API key) or the agent
                                    (needs a key) against evals/cases/. --json for raw output;
-                                   agent accepts --cases <id,…>, --repeat <n>, and --no-verify
-                                   (measures the baseline with the self-critique pass off).
+                                   agent accepts --cases <id,…>, --repeat <n>, --steps <n>,
+                                   --no-verify (baseline with the self-critique pass off),
+                                   --arm <grounded|raw-sql>, and --ab (run both arms
+                                   interleaved and print the grounding comparison).
   querypad help                    Show this help
 
 External databases (inspect · ask · enrich):
@@ -181,6 +183,7 @@ async function main(argv: string[]): Promise<number> {
       const { positionals, flags } = parseArgs(rest);
       const { runEval } = await import("./eval");
       const repeat = typeof flags.repeat === "string" ? Number(flags.repeat) : undefined;
+      const evalSteps = typeof flags.steps === "string" ? Number(flags.steps) : undefined;
       return runEval({
         suite: positionals[0] ?? "engine",
         json: flags.json === true,
@@ -188,6 +191,9 @@ async function main(argv: string[]): Promise<number> {
         repeat: repeat && Number.isFinite(repeat) ? repeat : undefined,
         provider: stringFlag(flags, "provider"),
         verify: flags["no-verify"] !== true,
+        arm: stringFlag(flags, "arm"),
+        ab: flags.ab === true,
+        steps: evalSteps && Number.isFinite(evalSteps) ? evalSteps : undefined,
       });
     }
     case "mcp": {

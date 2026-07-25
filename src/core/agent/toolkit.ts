@@ -117,6 +117,12 @@ export interface DataToolkitOptions {
   resolveTerms?: (query: string) => Promise<ResolvedTerm[]>;
   /** Max rows serialized into a tool's text output (default 50). */
   rowCap?: number;
+  /**
+   * Restrict the toolkit to these tool names (default: all of them). Used to
+   * build a deliberately less-grounded agent — the eval suite's control arm
+   * gets `run_sql` alone, so the value of the semantic tools can be measured.
+   */
+  only?: string[];
 }
 
 export interface DataToolkit {
@@ -163,6 +169,23 @@ function columnsOf(rows: Record<string, unknown>[]): string[] {
 export function createDataToolkit(options: DataToolkitOptions): DataToolkit {
   const { tables, model, relationships, runner } = options;
   const cap = options.rowCap ?? 50;
+  const allowed = options.only ? new Set(options.only) : null;
+  if (allowed) {
+    // Fail loudly at construction: a typo that silently left the agent with no
+    // tools would look like a measurement rather than a bug.
+    const unknown = [...allowed].filter(
+      (name) => !DATA_TOOL_DEFINITIONS.some((tool) => tool.name === name)
+    );
+    if (unknown.length > 0) {
+      throw new Error(
+        `Unknown tool name(s) in "only": ${unknown.join(", ")}. ` +
+          `Available: ${DATA_TOOL_DEFINITIONS.map((t) => t.name).join(", ")}`
+      );
+    }
+  }
+  const definitions = allowed
+    ? DATA_TOOL_DEFINITIONS.filter((tool) => allowed.has(tool.name))
+    : DATA_TOOL_DEFINITIONS;
   const lexicalCatalog = buildTermCatalog(model);
   const resolve =
     options.resolveTerms ?? (async (query: string) => resolveTerms(lexicalCatalog, query));
@@ -183,6 +206,14 @@ export function createDataToolkit(options: DataToolkitOptions): DataToolkit {
   }
 
   async function run(name: string, input: Record<string, unknown>): Promise<ToolOutcome> {
+    // Never throw for a withheld tool: the agent reads this and moves on, and the
+    // eval suite records a wrong answer rather than a harness error.
+    if (allowed && !allowed.has(name)) {
+      return {
+        text: `Tool "${name}" is not available. Available: ${[...allowed].join(", ")}`,
+        isError: true,
+      };
+    }
     switch (name) {
       case "list_tables":
         return {
@@ -249,5 +280,5 @@ export function createDataToolkit(options: DataToolkitOptions): DataToolkit {
     }
   }
 
-  return { definitions: DATA_TOOL_DEFINITIONS, run };
+  return { definitions, run };
 }

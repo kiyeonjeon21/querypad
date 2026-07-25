@@ -174,6 +174,7 @@ The agent never sees a write path: `run_sql` is read-only-gated, and with `--db`
 ```bash
 npm run eval:engine    # deterministic, no API key, runs in CI
 npm run eval:agent     # needs ANTHROPIC_API_KEY, costs tokens
+npm run eval:ab        # grounded vs raw-SQL, both arms interleaved
 ```
 
 Both suites score against `evals/dataset/` - a small e-commerce dataset built so a
@@ -206,8 +207,29 @@ revenue-by-plan          fail         5  row 1: got [12650], expected [9050]
 agent: 11/12 passed (91.7%), 1 failed
 ```
 
-Reports land in `.datactx/evals/` (gitignored) so runs can be diffed.
+Reports land in `.datactx/evals/` (gitignored) so runs can be diffed, each carrying the
+config it was produced under so a number is never quoted without its setup.
 `--repeat N` runs each case N times to surface non-determinism; `--cases a,b` narrows the run.
+
+**A/B suite** (`--ab`) answers the question the other two cannot: is the semantic layer
+actually worth anything? It runs a `grounded` arm (what ships) against a `raw-sql` arm
+(one read-only SQL tool, no inferred joins, no entities, no metrics) over the same cases,
+interleaved so API drift cannot masquerade as a result. The control is not crippled -
+`SHOW`/`DESCRIBE` are read-only, so it discovers the schema itself.
+
+The honest current answer, and the reason this suite exists:
+
+| | grounded | raw-sql |
+|---|---|---|
+| run pass rate | 29/36 (80.6%) | 28/36 (77.8%) |
+| strict cases | 8/12 | 9/12 |
+| **mean tool steps** | **1.7** | **4.3** |
+
+On **accuracy the grounding does not yet pay for itself** on this dataset: +2.8 points is
+inside the noise floor, the two metrics disagree on direction, and 8 of 12 cases pass 3/3 in
+*both* arms - a frontier model does not fall for a 7-table fan-out trap. On **efficiency it
+clearly does**: ~60% fewer exploration steps, on every case. Both numbers are printed with
+validity checks (turn-budget exhaustion, baseline controls) that must be read first.
 
 ## `explain`: justify every join
 

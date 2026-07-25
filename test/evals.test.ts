@@ -236,3 +236,218 @@ test("agent suite --repeat fails the case if any run fails", async () => {
   assert.equal(report.failed, 1);
   assert.match(report.results[0].detail, /runs failed/);
 });
+
+// ---- A/B arms (scripted agent, no API calls) ---------------------------------
+
+/** Wrap a scripted `complete` and record every {system, tools} it was handed. */
+function spyComplete(inner: AgentComplete): {
+  complete: AgentComplete;
+  calls: { system: string; tools: string[] }[];
+} {
+  const calls: { system: string; tools: string[] }[] = [];
+  return {
+    calls,
+    complete: async (input) => {
+      calls.push({ system: input.system, tools: input.tools.map((t) => t.name) });
+      return inner(input);
+    },
+  };
+}
+
+const COUNT_SQL = "SELECT COUNT(*) AS n FROM customers";
+
+test("toolkit allowlist withholds tools without breaking the loop's contract", async () => {
+  const { createDataToolkit, DATA_TOOL_DEFINITIONS } = await import("../src/core/agent/toolkit");
+  const base = {
+    tables: [],
+    model: { generatedAt: 0, entities: [] },
+    relationships: [],
+    runner: async () => {
+      throw new Error("runner must not be reached for a withheld tool");
+    },
+  };
+
+  const gated = createDataToolkit({ ...base, only: ["run_sql"] });
+  assert.deepEqual(
+    gated.definitions.map((d) => d.name),
+    ["run_sql"]
+  );
+
+  // Withheld tools resolve (never throw) and are flagged, so the suite records a
+  // wrong answer rather than a harness error.
+  const withheld = await gated.run("query_metric", { metric: "sum_amount" });
+  assert.equal(withheld.isError, true);
+  assert.match(withheld.text, /not available/);
+
+  // The gate precedes execution: this would throw via the runner otherwise.
+  const stillGated = createDataToolkit({ ...base, only: ["list_tables"] });
+  const refused = await stillGated.run("run_sql", { query: "SELECT 1" });
+  assert.equal(refused.isError, true);
+
+  // A typo must fail loudly, not silently leave the agent with no tools.
+  assert.throws(() => createDataToolkit({ ...base, only: ["run_sqll"] }), /Unknown tool name/);
+
+  // No allowlist: the shipped toolkit, unchanged (guards the MCP surface).
+  const full = createDataToolkit(base);
+  assert.deepEqual(full.definitions, DATA_TOOL_DEFINITIONS);
+});
+
+test("the raw-sql arm gets one tool and no grounding; grounded gets both", async () => {
+  const { runAgentSuite } = await import("../src/evals/run-agent");
+
+  const control = spyComplete(scriptedAgent(() => COUNT_SQL));
+  await runAgentSuite({
+    only: ["simple-count"],
+    arm: "raw-sql",
+    complete: control.complete,
+  });
+  for (const call of control.calls) {
+    assert.deepEqual(call.tools, ["run_sql"], "control must see exactly one tool");
+    assert.doesNotMatch(call.system, /Known relationships/);
+    assert.doesNotMatch(call.system, /Business entities/);
+    assert.doesNotMatch(call.system, /describe_table/);
+    // Safety wording is tool-mechanics parity, not grounding — it must stay.
+    assert.match(call.system, /read-only/);
+  }
+
+  const grounded = spyComplete(scriptedAgent(() => COUNT_SQL));
+  await runAgentSuite({
+    only: ["simple-count"],
+    arm: "grounded",
+    complete: grounded.complete,
+  });
+  const first = grounded.calls[0];
+  assert.equal(first.tools.length, 6);
+  assert.match(first.system, /Known relationships/);
+  assert.match(first.system, /Business entities/);
+});
+
+test("the grounded arm is byte-identical to the shipped default path", async () => {
+  const { runAgentSuite } = await import("../src/evals/run-agent");
+
+  const explicit = spyComplete(scriptedAgent(() => COUNT_SQL));
+  await runAgentSuite({ only: ["simple-count"], arm: "grounded", complete: explicit.complete });
+
+  const shipped = spyComplete(scriptedAgent(() => COUNT_SQL));
+  await runAgentSuite({ only: ["simple-count"], complete: shipped.complete });
+
+  // "Arm A is what ships" is a claim the A/B rests on, so assert it rather than
+  // asserting it in prose: same prompt, same tools, no override anywhere.
+  assert.deepEqual(explicit.calls, shipped.calls);
+});
+
+test("budget exhaustion is recorded rather than looking like a wrong answer", async () => {
+  const { runAgentQuery } = await import("../src/core/agent/loop");
+  const { createNodeDb } = await import("../src/engine/duckdb/connection");
+
+  let calls = 0;
+  const db = await createNodeDb();
+  try {
+    const result = await runAgentQuery({
+      question: "never finishes",
+      context: "",
+      tables: [],
+      model: { generatedAt: 0, entities: [] },
+      relationships: [],
+      runner: db.runner,
+      maxSteps: 3,
+      complete: async () => {
+        calls += 1;
+        return {
+          stopReason: "tool_use",
+          content: [{ type: "tool_use", id: `t${calls}`, name: "list_tables", input: {} }],
+        };
+      },
+    });
+    assert.equal(result.budgetExhausted, true);
+    // maxSteps turns plus the one forced final answer.
+    assert.equal(calls, 4);
+  } finally {
+    db.close();
+  }
+});
+
+test("agent suite records per-run passes alongside the strict case outcome", async () => {
+  const { runAgentSuite } = await import("../src/evals/run-agent");
+  let call = 0;
+  const report = await runAgentSuite({
+    only: ["simple-count"],
+    repeat: 3,
+    verify: false,
+    complete: scriptedAgent(() => {
+      call += 1;
+      // Two calls per run (tool, then finalize); call 3 is run 2's query.
+      return call === 3 ? "SELECT COUNT(*) + 1 AS n FROM customers" : COUNT_SQL;
+    }),
+  });
+
+  const [result] = report.results;
+  assert.equal(result.outcome, "fail", "strict rule: any bad run fails the case");
+  assert.equal(result.runsPassed, 2);
+  assert.equal(result.runsTotal, 3);
+  assert.equal(report.arm, "grounded");
+  assert.equal(report.config?.repeat, 3);
+  assert.equal(report.config?.verify, false);
+});
+
+test("behavioral assertions can be turned off, leaving accuracy-only grading", async () => {
+  const { runAgentSuite } = await import("../src/evals/run-agent");
+  // A right answer that overruns a 1-step budget: graded on the route, then not.
+  const cases: AgentCase[] = [
+    {
+      id: "budgeted",
+      question: "how many customers are there",
+      expectedSql: "SELECT COUNT(*) AS n FROM customers",
+      maxSteps: 0,
+    },
+  ];
+
+  const graded = await runAgentSuite({
+    cases,
+    verify: false,
+    complete: scriptedAgent(() => COUNT_SQL),
+  });
+  assert.equal(graded.passed, 0);
+  assert.match(graded.results[0].detail, /steps/);
+
+  const accuracyOnly = await runAgentSuite({
+    cases,
+    verify: false,
+    behavioral: false,
+    complete: scriptedAgent(() => COUNT_SQL),
+  });
+  assert.equal(accuracyOnly.passed, 1, accuracyOnly.results[0].detail);
+});
+
+test("runAbSuite measures both arms and formatComparison renders the delta", async () => {
+  const { runAbSuite } = await import("../src/evals/run-agent");
+  const { formatComparison } = await import("../src/evals/report");
+
+  // The control answers correctly; the grounded arm does too. Equal arms are the
+  // honest scripted outcome — what is asserted here is the plumbing and rendering.
+  const { arms } = await runAbSuite({
+    only: ["simple-count"],
+    verify: false,
+    complete: scriptedAgent(() => COUNT_SQL),
+  });
+
+  assert.equal(arms.length, 2);
+  assert.deepEqual(
+    arms.map((a) => a.arm),
+    ["grounded", "raw-sql"]
+  );
+  // Behavioral assertions must be off for both, or the arms have different rubrics.
+  for (const arm of arms) {
+    assert.equal(arm.config?.behavioral, false);
+    assert.equal(arm.errored, 0, JSON.stringify(arm.results));
+  }
+  // The control's exact preamble is stored so a reader can audit it.
+  assert.doesNotMatch(String(arms[1].config?.systemPrompt), /Known relationships/);
+
+  const out = formatComparison(arms[0], arms[1]);
+  assert.match(out, /grounded/);
+  assert.match(out, /raw-sql/);
+  assert.match(out, /delta/);
+  assert.match(out, /validity checks/);
+  assert.match(out, /turn budget hit on 0\//);
+});

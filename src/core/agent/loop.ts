@@ -69,6 +69,13 @@ export interface AgentQueryResult {
   steps: AgentStep[];
   /** Rows from the last successful `run_sql`, for display. */
   lastResult: AgentResultRows | null;
+  /**
+   * True when the turn budget ran out and a final answer was forced, rather than
+   * the agent finishing on its own. Without this, "it answered wrongly" and "it
+   * ran out of turns" are indistinguishable — which makes any comparison of two
+   * agent configurations unfalsifiable.
+   */
+  budgetExhausted: boolean;
 }
 
 /** Injectable model turn so the loop can be driven without network calls in tests. */
@@ -95,6 +102,13 @@ export interface RunAgentQueryOptions {
   maxSteps?: number;
   /** Run one self-critique turn before accepting the final answer (default false). */
   verify?: boolean;
+  /** Restrict the agent to these tool names (default: the whole toolkit). */
+  tools?: string[];
+  /**
+   * Replace the composed system prompt (preamble + grounding context). The eval
+   * suite's ungrounded control arm uses this; product callers should not.
+   */
+  systemPrompt?: string;
   onStep?: (step: AgentStep) => void;
 }
 
@@ -118,7 +132,7 @@ function toolUsesFrom(content: ContentBlock[]): ToolUseBlock[] {
 export async function runAgentQuery(options: RunAgentQueryOptions): Promise<AgentQueryResult> {
   const { question, context, tables, model, relationships, runner, complete } = options;
   const maxSteps = options.maxSteps ?? 8;
-  const system = `${AGENT_SYSTEM_PROMPT}\n\n${context}`;
+  const system = options.systemPrompt ?? `${AGENT_SYSTEM_PROMPT}\n\n${context}`;
 
   const sqlHistory: string[] = [];
   const steps: AgentStep[] = [];
@@ -134,6 +148,7 @@ export async function runAgentQuery(options: RunAgentQueryOptions): Promise<Agen
     relationships,
     runner,
     resolveTerms: options.resolveTerms,
+    only: options.tools,
   });
 
   const messages: ChatMessage[] = [{ role: "user", content: question }];
@@ -151,7 +166,13 @@ export async function runAgentQuery(options: RunAgentQueryOptions): Promise<Agen
         messages.push({ role: "user", content: buildVerificationTurn(question) });
         continue;
       }
-      return { answer: textFrom(content), sqlHistory, steps, lastResult };
+      return {
+        answer: textFrom(content),
+        sqlHistory,
+        steps,
+        lastResult,
+        budgetExhausted: false,
+      };
     }
 
     const toolResults: ToolResultBlock[] = [];
@@ -181,5 +202,11 @@ export async function runAgentQuery(options: RunAgentQueryOptions): Promise<Agen
     content: "You have reached the step limit. Give your best final answer now. Do not call any tools.",
   });
   const { content } = await complete({ system, messages, tools: [] });
-  return { answer: textFrom(content), sqlHistory, steps, lastResult };
+  return {
+    answer: textFrom(content),
+    sqlHistory,
+    steps,
+    lastResult,
+    budgetExhausted: true,
+  };
 }

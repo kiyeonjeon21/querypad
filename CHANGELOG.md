@@ -5,6 +5,24 @@ and public product updates.
 
 ## Unreleased
 
+### A price column is no longer mistaken for a join target (bug fix)
+
+- Relationship inference treated **any** unique, non-null column as a valid foreign-key target.
+  A small price list has unique prices, so every money column whose values happened to coincide
+  was "explained" as a foreign key into it - measured at 81%, 68% and 54% on a realistic fixture
+- The damage was worse than a wrong edge in the graph. Both endpoints of a relationship are
+  excluded from the semantic model, so a phantom edge **silently deleted the table's real
+  measure**: an invoice table stopped exposing `sum_net_amt` at all, with nothing in the output
+  to say why
+- A non-id target is now credible only when the foreign column names it outright, which is what
+  a genuine natural key looks like (`sku -> sku`, `region_cd -> region_cd`). Uniqueness alone no
+  longer qualifies
+- `isIdLike` moved to `signals.ts` as the single shared definition. The two halves of the engine
+  had disagreed about it: the semantic model already knew that "a unique, non-null column like
+  `amount` is a real measure, not a key", and inference did not
+- Both engine suites are unchanged (18/18 and 25/25), so no real edge was lost, and a regression
+  test pins the fixture that reproduces it
+
 ### Measures now carry their grain (bug fix)
 
 - A measure had no notion of the grain it is valid at, so being handed one could make the agent

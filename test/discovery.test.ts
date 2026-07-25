@@ -124,3 +124,54 @@ test("inspect fixtures yields exactly the two true relationships", async () => {
     db.close();
   }
 });
+
+// ---- non-id join targets -------------------------------------------------------
+
+test("a price column is not a join target, so its measure survives", async () => {
+  const { mkdtemp, writeFile } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { resolveSource } = await import("../src/adapters/cli/source");
+  const { buildSemanticModel } = await import("../src/core/discovery/semantic-model");
+
+  const dir = await mkdtemp(path.join(tmpdir(), "querypad-fk-target-"));
+  // A small price list has unique prices, so it passes the unique + non-null test
+  // that used to be the whole definition of a join target.
+  await writeFile(
+    path.join(dir, "price_list.csv"),
+    "id,sku,list_amt\n1,A,10.00\n2,B,20.00\n3,C,30.00\n4,D,40.00\n"
+  );
+  // line_amt holds those same values by coincidence. It is a measure, not a key.
+  await writeFile(
+    path.join(dir, "sales.csv"),
+    "id,sku,line_amt\n1,A,10.00\n2,B,20.00\n3,A,10.00\n4,C,30.00\n5,D,40.00\n6,B,20.00\n"
+  );
+
+  const db = await createNodeDb();
+  try {
+    const { tables } = await resolveSource({ folder: dir }).load(db.runner);
+    const profiles = await Promise.all(tables.map((t) => profileTable(t, db.runner, 1)));
+    const rels = await discoverRelationships(profiles, db.runner);
+    const keys = rels.map(relationshipKey);
+
+    // The natural key still joins: the foreign column names the target outright.
+    assert.ok(keys.includes("sales.sku->price_list.sku"), `expected the sku join, got ${keys}`);
+    // The money columns must not be mistaken for one, at any confidence.
+    assert.ok(
+      !keys.includes("sales.line_amt->price_list.list_amt"),
+      `value overlap alone must not make a price a join target, got ${keys}`
+    );
+
+    // The damage this prevents: both endpoints of a relationship are dropped from the
+    // semantic model, so a phantom edge silently deletes the table's real measure.
+    const model = buildSemanticModel(tables.map((t) => t.name), rels, 1, profiles);
+    const sale = model.entities.find((e) => e.table === "sales")!;
+    const priceList = model.entities.find((e) => e.table === "price_list")!;
+    assert.ok(sale.measures.some((m) => m.column === "line_amt"), "sales must keep sum_line_amt");
+    assert.ok(
+      priceList.measures.some((m) => m.column === "list_amt"),
+      "price_list must keep sum_list_amt"
+    );
+  } finally {
+    db.close();
+  }
+});

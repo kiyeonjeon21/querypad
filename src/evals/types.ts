@@ -99,6 +99,11 @@ export interface SuiteReport {
   arm?: string;
   /** Agent suite only: the full setup this score was produced under. */
   config?: SuiteConfig;
+  /** Which dataset and cases were scored — two datasets otherwise look identical. */
+  dataset?: string;
+  casesFile?: string;
+  /** Whether a glossary was applied (the grounding under test can depend on it). */
+  glossary?: boolean;
   generatedAt: number;
   total: number;
   passed: number;

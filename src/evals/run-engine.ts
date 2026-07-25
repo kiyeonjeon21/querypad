@@ -1,7 +1,8 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { compileMetric } from "../core/discovery/compile-metric";
-import { relationshipKey } from "../core/discovery/relationships";
+import type { GlossaryEntry } from "../core/discovery/glossary";
+import { relationshipKey, type QueryRunner } from "../core/discovery/relationships";
 import { buildTermCatalog, formatTarget } from "../core/discovery/term-catalog";
 import { resolveTerms } from "../core/discovery/term-search";
 import { createNodeDb } from "../engine/duckdb/connection";
@@ -15,6 +16,46 @@ export const ENGINE_CASES = "evals/cases/engine.json";
 
 export async function loadEngineCases(file = ENGINE_CASES): Promise<EngineCase[]> {
   return JSON.parse(await readFile(path.resolve(file), "utf8")) as EngineCase[];
+}
+
+export interface EngineSuiteOptions extends EvalDatasetOptions {
+  casesFile?: string;
+}
+
+/** Which dataset (and optional glossary) a suite run scores. */
+export interface EvalDatasetOptions {
+  datasetDir?: string;
+  /**
+   * A committed glossary to apply, e.g. `evals/dataset-hard/glossary.json`. The suites read
+   * no `.datactx/` cache, so curation has to be passed in explicitly.
+   */
+  glossaryFile?: string;
+}
+
+/** Read a committed glossary file (the `writeGlossary` doc shape, or a bare entry array). */
+export async function loadGlossary(file: string): Promise<GlossaryEntry[]> {
+  const parsed = JSON.parse(await readFile(path.resolve(file), "utf8")) as
+    | { entries?: GlossaryEntry[] }
+    | GlossaryEntry[];
+  return Array.isArray(parsed) ? parsed : (parsed.entries ?? []);
+}
+
+/**
+ * Load the dataset a suite grades. Shared by the engine and agent suites so the two
+ * cannot drift on which dataset or curation the engine was grounded in. Cached
+ * artifacts are deliberately ignored: the suite grades what the engine derives now.
+ */
+export async function loadEvalDataset(
+  options: EvalDatasetOptions,
+  runner: QueryRunner
+): Promise<PreparedDataset> {
+  const glossary = options.glossaryFile ? await loadGlossary(options.glossaryFile) : undefined;
+  return prepareDataset(
+    { ...resolveSource({ folder: options.datasetDir ?? EVAL_DATASET }), outDir: "/dev/null" },
+    runner,
+    Date.now(),
+    { glossary }
+  );
 }
 
 function gradeRelationship(testCase: EngineCase, dataset: PreparedDataset): string {
@@ -85,17 +126,13 @@ async function gradeTerm(testCase: EngineCase, dataset: PreparedDataset): Promis
  * fan-out), and term resolution. Needs no API key, so it runs in CI.
  */
 export async function runEngineSuite(
-  options: { datasetDir?: string; casesFile?: string } = {}
+  options: EngineSuiteOptions = {}
 ): Promise<SuiteReport> {
   const cases = await loadEngineCases(options.casesFile);
   const db = await createNodeDb();
   let dataset: PreparedDataset;
   try {
-    // Ignore any cached artifacts: the suite must grade what the engine derives now.
-    dataset = await prepareDataset(
-      { ...resolveSource({ folder: options.datasetDir ?? EVAL_DATASET }), outDir: "/dev/null" },
-      db.runner
-    );
+    dataset = await loadEvalDataset(options, db.runner);
 
     const results: CaseResult[] = [];
     for (const testCase of cases) {
@@ -140,6 +177,9 @@ export async function runEngineSuite(
     return {
       suite: "engine",
       generatedAt: Date.now(),
+      dataset: options.datasetDir ?? EVAL_DATASET,
+      casesFile: options.casesFile ?? ENGINE_CASES,
+      glossary: Boolean(options.glossaryFile),
       total: results.length,
       passed,
       failed,

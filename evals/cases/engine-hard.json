@@ -1,0 +1,182 @@
+[
+  {
+    "id": "hard-rel-line-sku-natural-key",
+    "kind": "relationship",
+    "describe": "invoice lines reference products by sku, a natural key, not by id",
+    "edge": "inv_line.sku->prod.sku",
+    "minConfidence": 95
+  },
+  {
+    "id": "hard-rel-acct-region-natural-key",
+    "kind": "relationship",
+    "describe": "accounts reference regions by region_cd, a natural key",
+    "edge": "acct.region_cd->region.region_cd",
+    "minConfidence": 95
+  },
+  {
+    "id": "hard-rel-cust-plan-natural-key",
+    "kind": "relationship",
+    "describe": "customers reference their plan by plan_cd, a natural key",
+    "edge": "cust_master.plan_cd->plan_ref.plan_cd",
+    "minConfidence": 95
+  },
+  {
+    "id": "hard-rel-inv-acct",
+    "kind": "relationship",
+    "describe": "invoices belong to a billing account",
+    "edge": "inv.acct_id->acct.id",
+    "minConfidence": 95
+  },
+  {
+    "id": "hard-rel-line-inv",
+    "kind": "relationship",
+    "describe": "invoice lines belong to an invoice",
+    "edge": "inv_line.inv_id->inv.id",
+    "minConfidence": 95
+  },
+  {
+    "id": "hard-rel-pay-inv",
+    "kind": "relationship",
+    "describe": "payments settle an invoice",
+    "edge": "pay.inv_id->inv.id",
+    "minConfidence": 90
+  },
+  {
+    "id": "hard-rel-acct-cust-opaque",
+    "kind": "relationship",
+    "describe": "acct.cust_id -> cust_master.id: opaque name, carried by value overlap",
+    "edge": "acct.cust_id->cust_master.id",
+    "minConfidence": 90
+  },
+  {
+    "id": "hard-rel-tkt-cust-opaque",
+    "kind": "relationship",
+    "describe": "tkt.cust_id -> cust_master.id: the second has_many, which makes fan-out possible",
+    "edge": "tkt.cust_id->cust_master.id",
+    "minConfidence": 90
+  },
+  {
+    "id": "hard-rel-prod-cat-opaque",
+    "kind": "relationship",
+    "describe": "prod.cat_id -> prod_cat.id: the target table is not named 'categories'",
+    "edge": "prod.cat_id->prod_cat.id",
+    "minConfidence": 90
+  },
+  {
+    "id": "hard-rel-no-staging-join",
+    "kind": "relationship",
+    "describe": "the decoy's surrogate id must not be read as a foreign key into inv, despite overlapping values",
+    "edge": "inv_staging.id->inv.id",
+    "absent": true
+  },
+  {
+    "id": "hard-entity-inv",
+    "kind": "entity",
+    "describe": "Inv exposes the authoritative money measure and its status/date dimensions",
+    "entity": "Inv",
+    "table": "inv",
+    "measures": ["inv_count", "sum_net_amt"],
+    "dimensions": ["status", "issued_on"]
+  },
+  {
+    "id": "hard-entity-cust-master",
+    "kind": "entity",
+    "describe": "CustMaster derives the soft-delete flag as a groupable dimension",
+    "entity": "CustMaster",
+    "table": "cust_master",
+    "measures": ["cust_master_count"],
+    "dimensions": ["is_active", "signed_on"]
+  },
+  {
+    "id": "hard-entity-tkt",
+    "kind": "entity",
+    "describe": "Tkt exposes severity as a dimension",
+    "entity": "Tkt",
+    "table": "tkt",
+    "measures": ["tkt_count"],
+    "dimensions": ["sev"]
+  },
+  {
+    "id": "hard-entity-inv-line",
+    "kind": "entity",
+    "describe": "InvLine derives measures over its numeric columns",
+    "entity": "InvLine",
+    "table": "inv_line",
+    "measures": ["inv_line_count", "sum_qty", "sum_unit_amt"]
+  },
+  {
+    "id": "hard-metric-revenue-by-status",
+    "kind": "metric",
+    "describe": "the money measure compiles grouped by its own table's dimension",
+    "metric": { "metric": "sum_net_amt", "dimensions": ["status"] }
+  },
+  {
+    "id": "hard-metric-count-by-status",
+    "kind": "metric",
+    "describe": "an invoice count compiles grouped by status",
+    "metric": { "metric": "inv_count", "dimensions": ["status"] }
+  },
+  {
+    "id": "hard-metric-refuses-payment-fanout",
+    "kind": "metric",
+    "describe": "revenue grouped by a payment date would fan out invoices across payments",
+    "metric": { "metric": "sum_net_amt", "dimensions": ["paid_on"] },
+    "expectRefusal": true
+  },
+  {
+    "id": "hard-metric-refuses-ticket-fanout",
+    "kind": "metric",
+    "describe": "counting customers by ticket severity would fan out customers across tickets",
+    "metric": { "metric": "cust_master_count", "dimensions": ["sev"] },
+    "expectRefusal": true
+  },
+  {
+    "id": "hard-metric-refuses-multi-hop",
+    "kind": "metric",
+    "describe": "revenue by ticket severity is more than one hop and must be refused rather than guessed",
+    "metric": { "metric": "sum_net_amt", "dimensions": ["sev"] },
+    "expectRefusal": true
+  },
+  {
+    "id": "hard-metric-refuses-unknown",
+    "kind": "metric",
+    "describe": "an undefined metric is refused with the available list",
+    "metric": { "metric": "gross_margin" },
+    "expectRefusal": true
+  },
+  {
+    "id": "hard-term-revenue",
+    "kind": "term",
+    "describe": "GLOSSARY-BACKED: 'revenue' reaches the opaque net_amt measure, which shares no token with sum_net_amt",
+    "term": "revenue",
+    "resolvesTo": "sum_net_amt"
+  },
+  {
+    "id": "hard-term-customer",
+    "kind": "term",
+    "describe": "GLOSSARY-BACKED: 'customer' reaches cust_master",
+    "term": "customer",
+    "resolvesTo": "cust_master"
+  },
+  {
+    "id": "hard-term-support-case",
+    "kind": "term",
+    "describe": "GLOSSARY-BACKED: 'support case' reaches the tkt table",
+    "term": "support case",
+    "resolvesTo": "tkt"
+  },
+  {
+    "id": "hard-term-load-buffer",
+    "kind": "term",
+    "describe": "GLOSSARY-BACKED: the decoy is findable by what it is, so it can be avoided",
+    "term": "load buffer",
+    "resolvesTo": "inv_staging"
+  },
+  {
+    "id": "hard-term-territory",
+    "kind": "term",
+    "describe": "GLOSSARY-BACKED: 'territory' reaches the region table",
+    "term": "territory",
+    "resolvesTo": "region"
+  }
+]

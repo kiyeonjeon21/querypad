@@ -172,10 +172,16 @@ The agent never sees a write path: `run_sql` is read-only-gated, and with `--db`
 ## `eval`: know whether a change made it better
 
 ```bash
-npm run eval:engine    # deterministic, no API key, runs in CI
-npm run eval:agent     # needs ANTHROPIC_API_KEY, costs tokens
-npm run eval:ab        # grounded vs raw-SQL, both arms interleaved
+npm run eval:engine        # deterministic, no API key, runs in CI
+npm run eval:engine:hard   # same, against the harder dataset
+npm run eval:agent         # needs ANTHROPIC_API_KEY, costs tokens
+npm run eval:ab            # grounded vs raw-SQL, both arms interleaved
+npm run eval:ab:hard       # the same A/B on the harder dataset
 ```
+
+Any suite can be pointed anywhere: `--dataset <folder> --cases-file <path> --glossary <path>`.
+Every report records which dataset, cases and curation produced it, so a number can never
+be quoted without its setup.
 
 Both suites score against `evals/dataset/` - a small e-commerce dataset built so a
 careless answer is *wrong*, not just differently phrased:
@@ -188,9 +194,31 @@ careless answer is *wrong*, not just differently phrased:
 | **Distinct vs count** | 9 customers placed 12 orders |
 | **Null join** | one order has no line items; INNER vs LEFT changes the result |
 
+`evals/dataset-hard/` is the second, harder dataset: 11 tables with deliberately bad naming,
+plus a committed glossary (`evals/glossary-hard.json`) standing in for a user who has run
+`enrich`. It exists because the first dataset stopped discriminating - 8 of its 12 cases now
+pass in *both* A/B arms. Its traps were chosen against the engine's **measured** solvable
+envelope rather than by intuition:
+
+| Trap | Why grounding can win it |
+|---|---|
+| Opaque foreign keys | `acct.cust_id -> cust_master.id` is inferred at 92% from value overlap; a model reading names must guess which of eleven tables `cust_id` points at |
+| Natural-key joins | lines reference products by `sku` and accounts reference regions by `region_cd`, never by `id` |
+| Glossary term to measure | "revenue" reaches `sum_net_amt`; it shares no token with that name, so only the glossary connects them |
+| Two money columns | `net_amt` is authoritative, `amt_txt` is a stale legacy mirror. Only the glossary says which |
+| Soft delete and void | churned customers and void invoices must be excluded, a rule the schema cannot express |
+| Decoy load buffer | `inv_staging` ids overlap `inv`; including it inflates revenue from 10,944 to 49,829 |
+| Fan-out | tickets are a second `has_many` off customers, so a naive double join inflates one customer's revenue 4x |
+
+Names like `cust_ref` or `owner` were **rejected** as traps: they score zero on name
+similarity, so the engine cannot solve them either and they would fail in both arms while
+discriminating nothing.
+
 **Engine suite** asserts what the deterministic layers derive: inferred relationships and
 their confidence, entity/dimension/measure derivation, metric compilation *including the
-refusals that prevent fan-out*, and term resolution.
+refusals that prevent fan-out*, and term resolution. It is 18/18 on the first dataset and
+25/25 on the hard one; drop `--glossary` and exactly the five term cases fail, which is how
+the enrichment chain is kept honest.
 
 **Agent suite** puts each question through the real agent loop, then compares its rows
 against ground truth produced by the case's `expectedSql` (never shown to the agent).
@@ -217,19 +245,28 @@ actually worth anything? It runs a `grounded` arm (what ships) against a `raw-sq
 interleaved so API drift cannot masquerade as a result. The control is not crippled -
 `SHOW`/`DESCRIBE` are read-only, so it discovers the schema itself.
 
-The honest current answer, and the reason this suite exists:
+The answer depends entirely on how hard the data is, which is the most useful thing this
+suite has produced:
 
-| | grounded | raw-sql |
-|---|---|---|
-| run pass rate | 29/36 (80.6%) | 28/36 (77.8%) |
-| strict cases | 8/12 | 9/12 |
-| **mean tool steps** | **1.7** | **4.3** |
+| | dataset | grounded | raw-sql | delta |
+|---|---|---|---|---|
+| run pass rate | original | 29/36 (80.6%) | 28/36 (77.8%) | +2.8 |
+| run pass rate | **hard** | **29/36 (80.6%)** | **21/36 (58.3%)** | **+22.2** |
+| mean tool steps | hard | **1.5** | 4.5 | ~60% fewer |
 
-On **accuracy the grounding does not yet pay for itself** on this dataset: +2.8 points is
-inside the noise floor, the two metrics disagree on direction, and 8 of 12 cases pass 3/3 in
-*both* arms - a frontier model does not fall for a 7-table fan-out trap. On **efficiency it
-clearly does**: ~60% fewer exploration steps, on every case. Both numbers are printed with
-validity checks (turn-budget exhaustion, baseline controls) that must be read first.
+On the original 7-table dataset the grounding buys **nothing measurable on accuracy**: +2.8
+points is inside the noise floor, the two metrics disagree on direction, and 8 of 12 cases pass
+in both arms. A frontier model simply does not fall for a small fan-out trap.
+
+On the hard dataset it wins clearly, and for a legible reason: every one of the control arm's
+failures traces to the same thing - it does not exclude void invoices, a business rule the
+schema cannot express and only the glossary carries. Two cases go 3/3 versus **0/3**.
+
+Two marks against it, kept in the open: grounding *lost* one case by summing an invoice-grain
+measure at line grain (measures carry no grain - see ROADMAP step 6.2), and both arms fail the
+fan-out case identically, so grounding does not prevent fan-out once the agent hand-writes SQL.
+Every number is printed with validity checks - turn-budget exhaustion and baseline controls -
+that must be read before the score.
 
 ## `explain`: justify every join
 

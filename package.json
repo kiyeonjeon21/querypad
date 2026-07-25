@@ -50,8 +50,8 @@
     "eval:engine": "tsx src/adapters/cli/index.ts eval engine",
     "eval:agent": "tsx src/adapters/cli/index.ts eval agent",
     "eval:ab": "tsx src/adapters/cli/index.ts eval agent --ab",
-    "eval:engine:hard": "tsx src/adapters/cli/index.ts eval engine --dataset evals/dataset-hard --cases-file evals/cases/engine-hard.json --glossary evals/dataset-hard/glossary.json",
-    "eval:ab:hard": "tsx src/adapters/cli/index.ts eval agent --ab --dataset evals/dataset-hard --cases-file evals/cases/agent-hard.json --glossary evals/dataset-hard/glossary.json"
+    "eval:engine:hard": "tsx src/adapters/cli/index.ts eval engine --dataset evals/dataset-hard --cases-file evals/cases/engine-hard.json --glossary evals/glossary-hard.json",
+    "eval:ab:hard": "tsx src/adapters/cli/index.ts eval agent --ab --dataset evals/dataset-hard --cases-file evals/cases/agent-hard.json --glossary evals/glossary-hard.json"
   },
   "dependencies": {
     "@duckdb/node-api": "^1.5.3-r.3"

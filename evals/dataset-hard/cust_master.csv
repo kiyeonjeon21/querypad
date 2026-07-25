@@ -1,0 +1,15 @@
+id,nm,plan_cd,is_active,signed_on
+1,Acme Corp,ENT,true,2025-01-10
+2,Globex,PRO,true,2025-01-22
+3,Initech,STR,true,2025-02-05
+4,Umbrella,ENT,true,2025-02-14
+5,Hooli,PRO,true,2025-02-28
+6,Stark Industries,ENT,true,2025-03-08
+7,Wayne Enterprises,PRO,false,2025-03-15
+8,Cyberdyne,STR,true,2025-03-21
+9,Tyrell Corp,STR,false,2025-04-02
+10,Soylent,PRO,true,2025-04-11
+11,Massive Dynamic,ENT,true,2025-04-19
+12,Vehement Capital,STR,false,2025-05-03
+13,Bluth Company,PRO,true,2025-05-12
+14,Dunder Mifflin,STR,false,2025-05-20

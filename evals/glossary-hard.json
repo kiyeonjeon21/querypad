@@ -1,0 +1,102 @@
+{
+  "generatedAt": 0,
+  "note": "Committed curation for the hard eval dataset - the state a user would be in after running `querypad enrich --apply` over a business glossary. Passed explicitly with --glossary because the suites read no .datactx/ cache. This is an eval INPUT: never edit it to make a run pass.",
+  "entries": [
+    {
+      "term": "net revenue",
+      "definition": "Authoritative amount billed, from inv.net_amt. Void invoices are cancelled and are excluded. Ignore inv.amt_txt: it is a legacy string mirror that is stale on some invoices.",
+      "synonyms": ["net revenue", "revenue", "billings", "billed amount"],
+      "mapsTo": { "table": "inv", "column": "net_amt" },
+      "confidence": 0.95,
+      "source": "finance-glossary.md"
+    },
+    {
+      "term": "invoice status",
+      "definition": "paid and open invoices are real billings; void means cancelled and must be excluded from revenue.",
+      "synonyms": ["billing status"],
+      "mapsTo": { "table": "inv", "column": "status" },
+      "confidence": 0.95,
+      "source": "finance-glossary.md"
+    },
+    {
+      "term": "customer",
+      "definition": "A billed company. is_active = false means churned.",
+      "synonyms": ["customer", "client", "account holder", "company"],
+      "mapsTo": { "table": "cust_master" },
+      "confidence": 0.95,
+      "source": "finance-glossary.md"
+    },
+    {
+      "term": "active",
+      "definition": "Whether the customer is still with us. Churned customers (false) are excluded from customer counts.",
+      "synonyms": ["active flag", "churn flag"],
+      "mapsTo": { "table": "cust_master", "column": "is_active" },
+      "confidence": 0.9,
+      "source": "finance-glossary.md"
+    },
+    {
+      "term": "account",
+      "definition": "A billing account belonging to a customer. One customer can hold several, one per region.",
+      "synonyms": ["account", "subscription"],
+      "mapsTo": { "table": "acct" },
+      "confidence": 0.9,
+      "source": "finance-glossary.md"
+    },
+    {
+      "term": "invoice",
+      "definition": "One issued bill against an account.",
+      "synonyms": ["invoice", "bill"],
+      "mapsTo": { "table": "inv" },
+      "confidence": 0.9,
+      "source": "finance-glossary.md"
+    },
+    {
+      "term": "support case",
+      "definition": "A support request raised by a customer.",
+      "synonyms": ["support case", "ticket", "case"],
+      "mapsTo": { "table": "tkt" },
+      "confidence": 0.9,
+      "source": "finance-glossary.md"
+    },
+    {
+      "term": "plan",
+      "definition": "The subscription tier a customer is on; the readable name lives in plan_ref.",
+      "synonyms": ["plan", "tier", "subscription plan"],
+      "mapsTo": { "table": "plan_ref" },
+      "confidence": 0.9,
+      "source": "finance-glossary.md"
+    },
+    {
+      "term": "product",
+      "definition": "A sellable item, keyed by sku. Invoice lines reference products by sku, not by id.",
+      "synonyms": ["product", "item"],
+      "mapsTo": { "table": "prod" },
+      "confidence": 0.9,
+      "source": "finance-glossary.md"
+    },
+    {
+      "term": "product category",
+      "definition": "The category a product belongs to.",
+      "synonyms": ["category", "product category"],
+      "mapsTo": { "table": "prod_cat" },
+      "confidence": 0.9,
+      "source": "finance-glossary.md"
+    },
+    {
+      "term": "staging buffer",
+      "definition": "A raw load buffer, NOT billable data. Its ids overlap inv. Never include it in any report or total.",
+      "synonyms": ["load buffer"],
+      "mapsTo": { "table": "inv_staging" },
+      "confidence": 0.95,
+      "source": "finance-glossary.md"
+    },
+    {
+      "term": "region",
+      "definition": "Sales region, joined from accounts by region_cd.",
+      "synonyms": ["region", "territory"],
+      "mapsTo": { "table": "region" },
+      "confidence": 0.9,
+      "source": "finance-glossary.md"
+    }
+  ]
+}

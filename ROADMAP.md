@@ -12,8 +12,8 @@ the reason the understanding engine is built **CLI-first**.
 **Surface decision (2026-07): terminal-first, desktop app as the flagship.**
 The browser app was retired (tag `web-final`, ~6k LOC removed); repeating it in a TUI would compete with polished terminal SQL IDEs (Harlequin) on ground that is not our moat.
 The surfaces today are the CLI and the MCP server.
-The planned flagship surface (step 7 below, decided 2026-07-25) is a native macOS desktop app: a data cockpit that embeds a libghostty terminal running Claude Code / Codex under the user's own subscription (no BYOK), with native data panels driven by the MCP channel.
-The CLI and MCP server are the app's foundation and stay first-class surfaces; the web only ever returns as an intro/landing page once the rename settles (step 8), never as a product UI.
+The planned flagship surface (step 8 below, decided 2026-07-25) is a native macOS desktop app: a data cockpit that embeds a libghostty terminal running Claude Code / Codex under the user's own subscription (no BYOK), with native data panels driven by the MCP channel.
+The CLI and MCP server are the app's foundation and stay first-class surfaces; the web only ever returns as an intro/landing page once the rename settles (step 9), never as a product UI.
 
 > Cursor understands code → generates code → edits code → runs code.
 > QueryPad understands datasets → infers relationships → generates SQL → executes analysis → explains findings.
@@ -175,13 +175,15 @@ architecture, naming). The intended moat is **semantic-first + local-first**: an
 governed semantic model is reliable where naked text-to-SQL is not, and almost every funded
 competitor is cloud/warehouse-native.
 
-**Status of that claim, measured (2026-07-25, step 4.2):** the accuracy half is **not supported
-yet**. Against a `run_sql`-only control on the trap dataset, grounding moved the run pass rate by
-+2.8 points - well inside the noise floor - and the two arms disagreed on direction depending on the
-metric. What grounding *did* buy, unambiguously, is **efficiency**: 1.7 versus 4.3 mean tool steps, a
-~60% cut, on every single case. Treat "grounded is more accurate" as an open hypothesis needing a
-harder dataset, and "grounded is cheaper and more auditable" as measured fact. Build one step at a
-time:
+**Status of that claim, measured twice (steps 4.2 and 4.3):** it holds, but only once the data is
+hard enough to tell. On the original trap dataset grounding moved the run pass rate by +2.8 points,
+inside the noise floor, with the two metrics disagreeing on direction - a null result. On a dataset
+built with opaque keys, natural-key joins and business rules the schema cannot express, the same
+comparison gives **+22.2 points (80.6% vs 58.3%)** with both metrics agreeing, and the control's
+failures collapse to a single cause: it does not know the rules only a glossary carries.
+Efficiency held in both runs (**1.5 vs 4.5** mean tool steps here, ~60% fewer). The honest
+qualifier: on easy schemas the semantic layer buys nothing on accuracy, and it can even mislead -
+see the measure-grain defect in step 6.2. Build one step at a time:
 
 1. **Agentic `ask` loop** — self-correcting, tool-using. ✅ Built.
 2. **Semantic layer** — ✅ Built (all five sub-steps). (Research-settled architecture: structured YAML core → DuckDB hybrid
@@ -248,14 +250,88 @@ time:
       lever is the verification checklist, not more semantic layer. And the trap dataset needs to
       get harder (more tables, worse names, genuinely ambiguous domains) before it can discriminate
       accuracy at this model tier. Per `AGENTS.md` nothing was tuned to improve the number.
+   3. **Hard dataset** - ✅ Built (`evals/dataset-hard/`, 11 tables + a committed glossary at
+      `evals/glossary-hard.json`; `eval:engine:hard` gates CI, `eval:ab:hard` is manual).
+      Built to the *measured* solvable envelope rather than by intuition: an FK is only
+      discoverable when it shares a token with `"<keyTable> <keyColumn>"`
+      (`NAME_SIMILARITY_FLOOR`, `signals.ts:10`), so names like `cust_ref` or `owner` were
+      rejected as traps - the engine cannot solve them either, so they would fail in both arms
+      and discriminate nothing. The traps that remain sit in the band where the engine infers a
+      join at 92-100% from value overlap while a model reading `cust_id` against eleven tables
+      has to guess: opaque FKs, two natural-key joins (`sku`, `region_cd`), a soft-delete flag,
+      a void-status filter, a decoy load buffer whose ids overlap the real invoice table, a
+      stale legacy money column beside the authoritative one, and a second `has_many` that makes
+      fan-out possible.
+      **Two findings before a single agent case ran.** (a) The dataset immediately exposed a real
+      engine defect: `inv_line.unit_amt -> prod.list_amt` was inferred at 81% purely because
+      money values coincided with the 6 unique prices in a lookup table, and because a
+      relationship endpoint is excluded from measures, `inv.net_amt` silently stopped being a
+      measure at all. `isKeyCandidate` (`relationships.ts:38`) only asks whether the *target* is
+      unique and non-null, which any small price column satisfies - see step 6.1. The fixture was
+      made realistic (negotiated prices, not list prices) so the intended traps work; the defect
+      is recorded, not worked around. (b) The glossary chain is provably load-bearing: the hard
+      engine suite scores 25/25 with `--glossary` and exactly the five `hard-term-*` cases fail
+      without it, and a test asserts that.
+      **The A/B on this dataset discriminates.** Same configuration as before (12 cases,
+      repeat 3, verify on, maxSteps 12), validity checks clean (neither arm hit the turn budget;
+      both baseline controls 2/2 in both arms):
+
+      | | grounded | raw-sql |
+      |---|---|---|
+      | run pass rate | **29/36 (80.6%)** | 21/36 (58.3%) |
+      | strict cases | **9/12** | 6/12 |
+      | mean tool steps | **1.5** | 4.5 |
+
+      **+22.2 points**, and unlike the first dataset both metrics now agree in direction. The
+      raw-sql arm's failures share one root cause: it never excludes void invoices, so it
+      returns 11,275.50 / 1,297.50 / 2,535 / 1,128 where the answers are 10,944 / 1,020 /
+      2,257.50 / 1,074. That is a business rule the schema cannot express and only the glossary
+      carries, which is exactly what the semantic layer is for. Biggest gaps:
+      `hard-revenue-by-region` and `hard-top-customer` are 3/3 vs **0/3**.
+      **Two honest marks against it.** Grounding *lost* `hard-revenue-by-category` 0/3 vs 1/3
+      through the measure-grain defect above - the one case where being handed a measure was
+      worse than having none. And `hard-fanout-revenue-and-cases` is **0/3 in both arms**: both
+      agents write the naive double join and inflate one customer's revenue 4x (8,156 vs 2,039),
+      so grounding does not prevent fan-out once the agent leaves `query_metric` and hand-writes
+      SQL. Per `AGENTS.md` nothing was tuned after seeing these numbers.
 5. **MCP server** — ✅ Built. `querypad mcp` serves the read-only toolkit over stdio. The
    tools are not a reimplementation: `createDataToolkit` (`src/core/agent/toolkit.ts`) is
    the single definition that both the internal `ask` loop and the MCP server consume, so
    an external agent sees exactly the tools our own agent uses — plus `describe_dataset`,
    which hands over the grounding context `ask` would otherwise put in its system prompt.
    With the web app retired this is the interactive surface: the coding agent is the UI.
-6. Short planning/decomposition for multi-part questions (bounded).
-7. **Native desktop app** (decided 2026-07-25) — the flagship product surface.
+6. **Engine defects surfaced by the hard dataset** - open, and worth fixing before more
+   semantic-layer work.
+   1. **Numeric value overlap creates phantom foreign keys.** `isKeyCandidate`
+      (`src/core/discovery/relationships.ts:38`) accepts any column that is unique and non-null
+      in its own table, so a small lookup table's `list_amt` is a valid FK *target*. Every money
+      column whose values coincide with those prices then gets an edge (measured: 81%, 68%, 54%
+      on the hard fixture before it was made realistic). The damage is not just a wrong edge in
+      the graph: `keyColumns` (`semantic-model.ts:75`) excludes both endpoints of every edge from
+      dimensions **and** measures, so the table's real money measure disappears without a word.
+      Candidate fix: require an FK target to look like a key (id-like name, or referenced by a
+      name-similar column), or refuse targets that are themselves measures.
+   2. **Measures have no grain, so naming one can actively mislead.** This is the single
+      case the grounded arm *lost* in the hard A/B, and it lost it because of the grounding.
+      The glossary names `inv.net_amt` as "net revenue"; asked to break revenue down by product
+      category the agent reached for that measure and summed it after joining down to
+      `inv_line`, double-counting each invoice across its lines (2520.5 instead of 1074 for
+      Software). The data is not ambiguous - line-level and header totals are both exactly
+      10,944 - so this is a real grain error, not a bad case. `SemanticMeasure` records
+      `agg` and `column` but nothing about the grain it is valid at, `query_metric` refuses
+      cross-grain joins only inside its own compiler, and `compile-metric.ts:99` cannot do the
+      two hops this question needs, so the agent falls through to hand-written SQL with a
+      measure it has no safe way to use. Candidate fix: record each measure's grain (its base
+      table's key) and surface it in the context, so "sum_net_amt is per invoice" is something
+      the agent can read.
+   3. **Duplicate measure names resolve silently.** Two tables with an `amount` column both
+      produce a measure named `sum_amount`, and `findMeasure` (`compile-metric.ts:33`) returns the
+      first by entity order. Same for duplicate dimension names, and `ensureJoin` matches on the
+      table pair rather than the column, so two FKs into one target pick whichever edge sorts
+      first. Deliberately left out of the hard dataset: it is an engine ambiguity to fix, not a
+      grounding trap to grade.
+7. Short planning/decomposition for multi-part questions (bounded).
+8. **Native desktop app** (decided 2026-07-25) — the flagship product surface.
    A native macOS app (Swift + AppKit) embeds a libghostty terminal pane running
    Claude Code / Codex under the user's own subscription (no BYOK).
    The app owns the querypad engine as a bundled subprocess and exposes the MCP
@@ -284,8 +360,8 @@ time:
       graph/chart panels, agent picker (claude / codex).
    Constraints: macOS-only initially (the proven libghostty embedding path);
    the Node engine ships bundled inside the .app (the native DuckDB addon rules
-   out easy single-binary compiles); distribution is gated on the rename (step 8).
-8. **Rename** (package / bin / domain / README) — *gated on formal trademark + domain
+   out easy single-binary compiles); distribution is gated on the rename (step 9).
+9. **Rename** (package / bin / domain / README) — *gated on formal trademark + domain
    clearance* (the name "datapad" was rejected: it collides with an active, funded
    competitor in the same category; "grain" has an npm squatter + a language collision).
    The artifact dir is already brand-independent (`.datactx/`), and npm publish waits

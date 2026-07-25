@@ -1,0 +1,7 @@
+id,sku,nm,cat_id,list_amt
+1,HW-LAP,Laptop,1,1500.00
+2,HW-MON,Monitor,1,400.00
+3,SW-IDE,IDE License,2,200.00
+4,SW-CLD,Cloud Seat,2,60.00
+5,SV-ONB,Onboarding,3,900.00
+6,SV-SUP,Support Retainer,3,300.00

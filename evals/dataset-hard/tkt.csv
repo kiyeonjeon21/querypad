@@ -1,0 +1,13 @@
+id,cust_id,sev
+1,1,high
+2,1,low
+3,1,low
+4,2,medium
+5,4,high
+6,4,low
+7,6,medium
+8,8,low
+9,11,high
+10,11,medium
+11,13,low
+12,1,medium

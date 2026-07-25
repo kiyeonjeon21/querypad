@@ -508,3 +508,64 @@ test("a scored glossary is recorded on the report and reaches the model", async 
   // The glossary annotation must actually reach the grounding context the model saw.
   assert.match(spy.calls[0].system, /aka net revenue/);
 });
+
+// ---- the hard dataset ----------------------------------------------------------
+
+test("the hard engine suite is green, and its term cases depend on the glossary", async () => {
+  const { runEngineSuite } = await import("../src/evals/run-engine");
+  const hard = {
+    datasetDir: "evals/dataset-hard",
+    casesFile: "evals/cases/engine-hard.json",
+  };
+
+  const withGlossary = await runEngineSuite({
+    ...hard,
+    glossaryFile: "evals/glossary-hard.json",
+  });
+  assert.equal(withGlossary.errored, 0, JSON.stringify(withGlossary.results));
+  assert.equal(
+    withGlossary.failed,
+    0,
+    `hard engine regressions: ${withGlossary.results
+      .filter((r) => r.outcome !== "pass")
+      .map((r) => `${r.id}: ${r.detail}`)
+      .join(" | ")}`
+  );
+  assert.ok(withGlossary.total >= 20, "expected a meaningful number of hard cases");
+
+  // Drop the glossary and the term cases must be the only thing that breaks. This is
+  // the machine-checkable proof that the enrichment chain is load-bearing rather than
+  // decorative: if it ever silently stops working, this test fails.
+  const withoutGlossary = await runEngineSuite(hard);
+  const broken = withoutGlossary.results.filter((r) => r.outcome !== "pass").map((r) => r.id);
+  assert.ok(broken.length > 0, "the glossary must change the outcome");
+  assert.ok(
+    broken.every((id) => id.startsWith("hard-term-")),
+    `only term cases should depend on the glossary, got: ${broken.join(", ")}`
+  );
+});
+
+test("every hard agent case has runnable ground truth", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const { createNodeDb } = await import("../src/engine/duckdb/connection");
+  const { resolveSource } = await import("../src/adapters/cli/source");
+
+  const cases = JSON.parse(
+    await readFile("evals/cases/agent-hard.json", "utf8")
+  ) as AgentCase[];
+  assert.ok(cases.length >= 10);
+  // Two baseline controls: without them a poor control-arm score cannot be told apart
+  // from a broken harness.
+  assert.ok(cases.filter((c) => c.trap === "baseline").length >= 2);
+
+  const db = await createNodeDb();
+  try {
+    await resolveSource({ folder: "evals/dataset-hard" }).load(db.runner);
+    for (const testCase of cases) {
+      const rows = await db.runner(testCase.expectedSql);
+      assert.ok(rows.length > 0, `${testCase.id}: expectedSql returned no rows`);
+    }
+  } finally {
+    db.close();
+  }
+});

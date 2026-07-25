@@ -51,6 +51,22 @@ export async function readVerdicts(folder: string): Promise<VerdictsDoc | null> 
   return readJson<VerdictsDoc>(path.join(dir, VERDICTS_FILE));
 }
 
+/** The shape `writeGlossary` persists. */
+export interface GlossaryDoc {
+  generatedAt: number;
+  entries: GlossaryEntry[];
+  applied: AppliedChange[];
+}
+
+/**
+ * Read the applied glossary (null when absent). Like `verdicts.json` this is curation,
+ * not derived output: `ask` re-applies it on every run so `enrich --apply` sticks.
+ */
+export async function readGlossary(folder: string): Promise<GlossaryDoc | null> {
+  const dir = path.resolve(folder, ARTIFACT_DIR);
+  return readJson<GlossaryDoc>(path.join(dir, GLOSSARY_FILE));
+}
+
 /** A precomputed term index: the catalog with a vector per entry. */
 export interface TermEmbeddings {
   model: string;

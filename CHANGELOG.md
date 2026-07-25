@@ -5,6 +5,22 @@ and public product updates.
 
 ## Unreleased
 
+### Enrichment now reaches the agent and the resolver (bug fix)
+
+- `enrich --apply` wrote descriptions and synonyms that **nothing ever read back**: there was no
+  `readGlossary`, and `prepareDataset` rebuilt the semantic model from profiles on every run, so
+  every enrichment was discarded before the next `ask`. `glossary.json` is now a curation input
+  re-applied over the derived model, exactly as `verdicts.json` is re-applied over inferred
+  relationships
+- Glossary entries naming a **numeric** column were silently dropped, because a numeric column
+  becomes a *measure* and `mergeGlossary` only looked at dimensions. Column-level entries now
+  resolve against measures too - which is what makes a money term like "revenue" attachable at all
+- `SemanticDimension` and `SemanticMeasure` carry `synonyms`, and `buildTermCatalog` indexes them,
+  so a business word can finally resolve to an opaque column: `resolve_terms("net revenue")` now
+  returns `sum_amt_c` where before it returned "No matching terms"
+- The grounding context renders entity descriptions/synonyms and inline dimension/measure
+  annotations, so enrichment is visible to the agent rather than only to the YAML file
+
 ### Grounded vs raw-SQL A/B (the moat claim, measured)
 
 - New `querypad eval agent --ab`: runs two arms over the same cases, **interleaved case by case**

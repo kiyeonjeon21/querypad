@@ -31,8 +31,14 @@ core/engine are a type error, not a code-review catch.
 
 - `inspect` writes `.datactx/` (schema.json, relationships.json,
   semantic-model.yaml/.json, inspect-summary.md; optionally term-embeddings.json).
-- `.datactx/verdicts.json` is the user's curation (reject/override inferred joins);
-  `inspect`, `ask`, and `explain` must honor it and re-runs must preserve it.
+- There are **two curation layers**, both inputs that every surface must honor and re-runs must preserve:
+  - `.datactx/verdicts.json` - which joins are real (reject/override inferred joins).
+  - `.datactx/glossary.json` - what things mean (descriptions + synonyms from `enrich`).
+    `prepareDataset` re-applies it over the freshly derived model, the same way verdicts are
+    re-applied over freshly inferred relationships. A glossary entry may name a column that
+    became a **measure** rather than a dimension (numeric columns always do), and measure/dimension
+    synonyms are indexed by `buildTermCatalog` - that chain is the only route from a business word
+    like "revenue" to an opaque column like `amt_c`, so do not break a link in it.
 
 ## Evals
 

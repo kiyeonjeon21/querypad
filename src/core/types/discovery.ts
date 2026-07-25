@@ -46,6 +46,8 @@ export interface SemanticDimension {
   values?: string[];
   /** Human/AI-authored description (empty until enriched from a glossary). */
   description?: string;
+  /** Alternative surface terms, from a glossary. Searchable via term resolution. */
+  synonyms?: string[];
 }
 
 /** A named aggregation over an entity. `count` omits `column`. */
@@ -53,6 +55,14 @@ export interface SemanticMeasure {
   name: string;
   agg: "count" | "sum";
   column?: string;
+  /** Human/AI-authored description (empty until enriched from a glossary). */
+  description?: string;
+  /**
+   * Alternative surface terms, from a glossary. This is how a business word like
+   * "revenue" reaches an opaque column such as `amt_c`: the measure is named
+   * `sum_amt_c`, which no lexical search would ever match.
+   */
+  synonyms?: string[];
 }
 
 /** A named business entity derived from a table and its relationships. */

@@ -24,7 +24,10 @@ const MODEL: SemanticModel = {
       table: "users",
       synonyms: ["users"],
       dimensions: [{ name: "plan", column: "plan", kind: "categorical" }],
-      measures: [{ name: "users_count", agg: "count" }],
+      measures: [
+        { name: "users_count", agg: "count" },
+        { name: "sum_amt_c", agg: "sum", column: "amt_c" },
+      ],
       belongsTo: [],
       hasMany: [],
       hasOne: [],
@@ -132,4 +135,132 @@ test("runEnrich builds the model, applies extracted terms, and writes glossary.j
     await readFile("fixtures/data/.datactx/glossary.json", "utf8")
   ) as { entries: unknown[] };
   assert.ok(Array.isArray(glossary.entries) && glossary.entries.length === 2);
+});
+
+// ---- glossary reaches term resolution -----------------------------------------
+
+test("mergeGlossary annotates a measure, so money terms are no longer dropped", () => {
+  // `amt_c` is numeric, so it becomes a measure and never a dimension. Before this
+  // path existed, every glossary entry naming a money column was silently discarded.
+  const { model, applied } = mergeGlossary(MODEL, [
+    {
+      term: "revenue",
+      definition: "Money billed to customers.",
+      synonyms: ["net revenue", "billings"],
+      mapsTo: { table: "users", column: "amt_c" },
+      confidence: 0.9,
+    },
+  ]);
+
+  const measure = model.entities[0].measures.find((m) => m.column === "amt_c");
+  assert.equal(measure?.description, "Money billed to customers.");
+  assert.deepEqual(measure?.synonyms, ["net revenue", "billings"]);
+  assert.ok(applied.some((c) => c.target === "users.amt_c" && c.field === "synonyms"));
+  // Purity: the shared fixture is not mutated.
+  assert.equal(MODEL.entities[0].measures[1].synonyms, undefined);
+});
+
+test("mergeGlossary adds dimension synonyms and skips its own column name", () => {
+  const { model } = mergeGlossary(MODEL, [
+    {
+      term: "tier",
+      definition: "The subscription tier.",
+      synonyms: ["tier", "plan", " "],
+      mapsTo: { table: "users", column: "plan" },
+      confidence: 0.9,
+    },
+  ]);
+  // "plan" is the column's own name and " " is blank; only "tier" is a new surface term.
+  assert.deepEqual(model.entities[0].dimensions[0].synonyms, ["tier"]);
+});
+
+test("a business word resolves to an opaque measure only once the glossary is applied", async () => {
+  const { buildTermCatalog, formatTarget } = await import("../src/core/discovery/term-catalog");
+  const { resolveTerms } = await import("../src/core/discovery/term-search");
+
+  const bare = await resolveTerms(buildTermCatalog(MODEL), "net revenue");
+  assert.equal(bare.length, 0, "sum_amt_c shares no token with 'net revenue'");
+
+  const { model } = mergeGlossary(MODEL, [
+    {
+      term: "revenue",
+      definition: "Money billed.",
+      synonyms: ["net revenue"],
+      mapsTo: { table: "users", column: "amt_c" },
+      confidence: 0.9,
+    },
+  ]);
+  const hits = await resolveTerms(buildTermCatalog(model), "net revenue");
+  assert.ok(hits.length > 0, "the glossary synonym must be searchable");
+  assert.equal(formatTarget(hits[0].entry.target), "sum_amt_c");
+});
+
+test("the grounding context surfaces glossary descriptions and synonyms", async () => {
+  const { buildAskContext } = await import("../src/core/agent/ask-context");
+
+  const plain = buildAskContext({ tables: [], relationships: [], semanticModel: MODEL });
+  assert.doesNotMatch(plain, /Money billed/);
+
+  const { model } = mergeGlossary(MODEL, [
+    { term: "account", definition: "A paying customer.", synonyms: ["account"], mapsTo: { table: "users" }, confidence: 1 },
+    {
+      term: "revenue",
+      definition: "Money billed.",
+      synonyms: ["net revenue"],
+      mapsTo: { table: "users", column: "amt_c" },
+      confidence: 1,
+    },
+  ]);
+  const enriched = buildAskContext({ tables: [], relationships: [], semanticModel: model });
+  assert.match(enriched, /A paying customer\./);
+  assert.match(enriched, /also called: users, account/);
+  assert.match(enriched, /aka net revenue - Money billed\./);
+});
+
+test("prepareDataset applies glossary.json as curation, like verdicts.json", async () => {
+  const { createNodeDb } = await import("../src/engine/duckdb/connection");
+  const { prepareDataset } = await import("../src/adapters/dataset");
+  const { writeGlossary } = await import("../src/adapters/cli/artifacts");
+
+  // A real folder source so the model is derived from actual profiles.
+  const dir = await mkdtemp(path.join(tmpdir(), "querypad-prep-"));
+  await writeFile(
+    path.join(dir, "sales.csv"),
+    "id,region,amount\n1,west,10.5\n2,east,20.25\n3,west,5.0\n4,east,1.75\n"
+  );
+  const entries = [
+    {
+      term: "revenue",
+      definition: "Money billed.",
+      synonyms: ["net revenue"],
+      mapsTo: { table: "sales", column: "amount" },
+      confidence: 0.9,
+    },
+  ];
+  await writeGlossary(dir, { generatedAt: 1, entries, applied: [] });
+
+  const db = await createNodeDb();
+  try {
+    const source = resolveSource({ folder: dir });
+    const curated = await prepareDataset(source, db.runner);
+    const measure = curated.model.entities[0].measures.find((m) => m.column === "amount");
+    assert.deepEqual(measure?.synonyms, ["net revenue"], "glossary.json must be honored");
+    assert.match(curated.context, /aka net revenue/);
+
+    // outDir elsewhere (what the eval harness does) means no curation is picked up,
+    // and the explicit override is the way back in.
+    const noCache = { ...source, outDir: "/dev/null" };
+    const bare = await prepareDataset(noCache, db.runner);
+    assert.equal(
+      bare.model.entities[0].measures.find((m) => m.column === "amount")?.synonyms,
+      undefined
+    );
+    const injected = await prepareDataset(noCache, db.runner, Date.now(), { glossary: entries });
+    assert.deepEqual(
+      injected.model.entities[0].measures.find((m) => m.column === "amount")?.synonyms,
+      ["net revenue"]
+    );
+  } finally {
+    db.close();
+  }
 });

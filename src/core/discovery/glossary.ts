@@ -83,10 +83,38 @@ function cloneModel(model: SemanticModel): SemanticModel {
   };
 }
 
+/** A model object a glossary entry can annotate: an entity, a dimension, or a measure. */
+interface Annotatable {
+  description?: string;
+  synonyms?: string[];
+}
+
 /**
- * Apply glossary entries to a copy of the model: entity- or dimension-level descriptions and
- * entity synonyms. Entries are dropped when below the confidence floor or when `mapsTo` names
- * a table/column that doesn't exist (schema grounding). Existing descriptions are not overwritten.
+ * Add synonyms to a target, skipping blanks, its own name, and duplicates.
+ * Returns the ones actually added so the caller can report them.
+ */
+function addSynonyms(target: Annotatable, own: string, synonyms: string[]): string[] {
+  const added: string[] = [];
+  for (const synonym of synonyms) {
+    const clean = synonym.trim();
+    if (!clean || clean === own) continue;
+    target.synonyms = target.synonyms ?? [];
+    if (target.synonyms.includes(clean)) continue;
+    target.synonyms.push(clean);
+    added.push(clean);
+  }
+  return added;
+}
+
+/**
+ * Apply glossary entries to a copy of the model: descriptions and synonyms on the entity,
+ * dimension, or measure a term maps to. Entries are dropped when below the confidence floor
+ * or when `mapsTo` names a table/column that doesn't exist (schema grounding). Existing
+ * descriptions are not overwritten.
+ *
+ * A column-level entry resolves against dimensions *and* measures. That matters because a
+ * numeric column never becomes a dimension — it becomes a measure named `sum_<column>` — so
+ * without the measure lookup, every money term in a glossary was silently discarded.
  */
 export function mergeGlossary(
   model: SemanticModel,
@@ -102,34 +130,24 @@ export function mergeGlossary(
     const entity = byTable.get(entry.mapsTo.table);
     if (!entity) continue; // unknown table → drop
 
-    if (entry.mapsTo.column) {
-      const dim = entity.dimensions.find((d) => d.column === entry.mapsTo!.column);
-      if (!dim) continue; // unknown column → drop
-      if (entry.definition && !dim.description) {
-        dim.description = entry.definition;
-        applied.push({
-          target: `${entity.table}.${dim.column}`,
-          field: "description",
-          value: entry.definition,
-        });
-      }
-      continue;
-    }
+    const column = entry.mapsTo.column;
+    // Entity-level when no column is named; otherwise the dimension or the measure
+    // built over that column.
+    const target: Annotatable | undefined = column
+      ? (entity.dimensions.find((d) => d.column === column) ??
+        entity.measures.find((m) => m.column === column))
+      : entity;
+    if (!target) continue; // unknown column → drop
+    const label = column ? `${entity.table}.${column}` : entity.name;
+    const own = column ?? entity.name;
 
-    if (entry.definition && !entity.description) {
-      entity.description = entry.definition;
-      applied.push({ target: entity.name, field: "description", value: entry.definition });
+    if (entry.definition && !target.description) {
+      target.description = entry.definition;
+      applied.push({ target: label, field: "description", value: entry.definition });
     }
-    const added: string[] = [];
-    for (const synonym of entry.synonyms) {
-      const clean = synonym.trim();
-      if (clean && clean !== entity.name && !entity.synonyms.includes(clean)) {
-        entity.synonyms.push(clean);
-        added.push(clean);
-      }
-    }
+    const added = addSynonyms(target, own, entry.synonyms);
     if (added.length > 0) {
-      applied.push({ target: entity.name, field: "synonyms", value: added.join(", ") });
+      applied.push({ target: label, field: "synonyms", value: added.join(", ") });
     }
   }
 

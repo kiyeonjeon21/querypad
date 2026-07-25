@@ -45,20 +45,40 @@ export function buildTermCatalog(model: SemanticModel): TermEntry[] {
       });
     }
     for (const dim of entity.dimensions) {
+      const target = { ...base, column: dim.column };
       entries.push({
         term: dim.name,
         kind: "dimension",
-        target: { ...base, column: dim.column },
+        target,
         text: `${dim.name} ${dim.kind} dimension of ${entity.name}`,
       });
+      // Glossary synonyms are the only route from a business word to an opaque
+      // column name, so they have to be searchable terms in their own right.
+      for (const synonym of dim.synonyms ?? []) {
+        entries.push({
+          term: synonym,
+          kind: "synonym",
+          target,
+          text: `${synonym} ${dim.name} dimension of ${entity.name}`,
+        });
+      }
     }
     for (const measure of entity.measures) {
+      const target = { ...base, metric: measure.name };
       entries.push({
         term: measure.name,
         kind: "measure",
-        target: { ...base, metric: measure.name },
+        target,
         text: `${measure.name} ${measure.agg} measure of ${entity.name}`,
       });
+      for (const synonym of measure.synonyms ?? []) {
+        entries.push({
+          term: synonym,
+          kind: "synonym",
+          target,
+          text: `${synonym} ${measure.name} measure of ${entity.name}`,
+        });
+      }
     }
   }
   return entries;

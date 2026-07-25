@@ -439,8 +439,26 @@ see the measure-grain defect in step 6.2. Build one step at a time:
       is linked and probed but not yet rendering. When the full embedding API stabilizes, the
       swap is an implementation project, not a feasibility question. cmux was not studied and
       did not need to be: ghostling is official and MIT, so the GPL question never arises.
-   3. **Data channel** — MCP over the app-owned local socket plus the first
-      native panel: a result table updating live as the agent queries.
+   3. **Data channel** - ✅ Built and verified live (2026-07-26). The app spawns
+      `querypad mcp` as a stdio child, hosts the conversation on a Unix socket it owns
+      (owner-only permissions), and proxies every frame - so every tool call and result
+      set flows through the app as structure. Claude Code joins via `querypad
+      mcp-attach` (the ~35-line bridge, since stdio clients cannot dial a socket; the
+      engine itself is untouched and stdio remains its only transport). The first
+      native panels: a live result table with the SELECT's column order preserved, an
+      activity feed of recent tool calls, and the executed SQL as the headline.
+      **Verified with a real agent on the hard dataset**: Claude Code answered the
+      fan-out question correctly (Acme 2,039/4, all seven rows matching ground truth)
+      with the panel showing the CTE that aggregates each grain separately - the exact
+      pattern the planning pass teaches - and in open-ended analysis it spontaneously
+      caught both planted data-quality traps (the 0.00 open invoice, and net_amt 609 vs
+      amt_txt "600.00 USD" on invoice 17, the stale-legacy-column trap).
+      **What the first session's failures taught**: a warning-free build is not a
+      working app. The panel was squeezed out by the terminal (no holding priorities),
+      an empty striped table read as mystery pills, and the second differently-shaped
+      result crashed the app - addTableColumn synchronously queries the delegate
+      against stale row indices. All three found by a human using it, none by the
+      automated wire test, which is the argument for keeping both kinds of check.
    4. **Product skeleton** — per-dataset workspaces, session restore,
       graph/chart panels, agent picker (claude / codex).
    Constraints: macOS-only initially (the proven libghostty embedding path);

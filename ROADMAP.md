@@ -374,7 +374,31 @@ see the measure-grain defect in step 6.2. Build one step at a time:
       **Re-measured after the fix**: the hard A/B is unchanged at **+30.6** (grounded 31/36,
       raw-sql 20/36) across two runs at different code states, which is a useful reproducibility
       signal for the harness itself.
-7. Short planning/decomposition for multi-part questions (bounded).
+7. **Short planning/decomposition for multi-part questions** - ✅ Built (`PLANNING_PROMPT`,
+   `buildPlanningTurn`, `src/core/agent/loop.ts`; `--no-plan` to disable).
+   Before acting on a question that asks for more than one thing, the agent writes a plan in a
+   turn with **no tools offered**, so it has to commit to an approach in writing first. That
+   forcing function is the point: the grain warning from 6.2 was already in the context for the
+   failing entity and did not prevent the double count, because the agent wrote one confident
+   query in a single step.
+   **Deliberately narrow trigger.** A false negative costs nothing; a false positive spends a
+   turn on every question. A bare "and" would have fired on "give the customer name and the
+   amount" - one quantity in two columns, already answered correctly - so the trigger keys on a
+   genuine second quantity or instruction. Write-verb questions are excluded outright: measured,
+   planning them turned a wrong number into a blank refusal, the over-refusal failure the
+   verification pass exists to prevent. Their failure was never decomposition, so safety stays
+   verification's job.
+   **Measured** on `hard-fanout-revenue-and-cases`, the only case in either suite that triggers
+   it: **1/8 runs without planning, 8/8 with** (a repeat-5 run plus a full-suite repeat-3 run
+   each way). The 2x fan-out inflation it was returning is gone.
+   **Suite-level, stated honestly**: the hard A/B moved **+30.6 to +33.3** (grounded 31/36 to
+   33/36). That is close to one noise unit, and it has to be: planning fires on 1 of 12 cases, so
+   the most it could ever move the aggregate is 8.3 points. The case-level result is strong, the
+   suite-level result is weak, and those are different claims.
+   **Two implementation bugs the measurement caught**, neither visible to the scripted tests:
+   the transcript ended on an assistant turn (which the API rejects outright), and the agent
+   finalized on the plan without running anything in 2 of 5 runs until the handoff message said
+   plainly that the plan is not the answer.
 8. **Native desktop app** (decided 2026-07-25) — the flagship product surface.
    A native macOS app (Swift + AppKit) embeds a libghostty terminal pane running
    Claude Code / Codex under the user's own subscription (no BYOK).

@@ -62,6 +62,8 @@ export interface AgentSuiteOptions extends EvalDatasetOptions {
   verify?: boolean;
   /** Which configuration to measure (default "grounded" — what ships). */
   arm?: ArmId;
+  /** Plan first on multi-part questions (default true; mirrors shipped `ask`). */
+  plan?: boolean;
   /**
    * Apply the case file's behavioral assertions (mustUseTool / mustNotUseTool /
    * maxSteps). Default true, which is right for the product-regression suite.
@@ -144,6 +146,7 @@ interface CaseDeps {
   repeat: number;
   maxSteps?: number;
   verify: boolean;
+  plan: boolean;
   behavioral: boolean;
   onProgress?: (line: string) => void;
 }
@@ -178,6 +181,7 @@ async function runCase(
         runner: deps.runner,
         maxSteps: deps.maxSteps,
         verify: deps.verify,
+        plan: deps.plan,
         tools: arm.tools,
         systemPrompt: arm.systemPrompt,
         complete: deps.complete,
@@ -258,6 +262,7 @@ export async function runAgentSuite(options: AgentSuiteOptions = {}): Promise<Su
       repeat,
       maxSteps: options.maxSteps,
       verify: options.verify ?? true,
+      plan: options.plan ?? true,
       behavioral: options.behavioral ?? true,
       onProgress: options.onProgress,
     };
@@ -287,6 +292,7 @@ function describeConfig(armId: ArmId, deps: CaseDeps): SuiteConfig {
     arm: armId,
     repeat: deps.repeat,
     verify: deps.verify,
+    plan: deps.plan,
     behavioral: deps.behavioral,
     maxSteps: deps.maxSteps ?? DEFAULT_MAX_STEPS,
     tools: ARMS[armId].tools ?? DATA_TOOL_DEFINITIONS.map((t) => t.name),
@@ -324,6 +330,7 @@ export async function runAbSuite(
       repeat,
       maxSteps: options.maxSteps ?? AB_MAX_STEPS,
       verify: options.verify ?? true,
+      plan: options.plan ?? true,
       // Accuracy-only for both arms: identical rubric is the whole point.
       behavioral: false,
       onProgress: options.onProgress,

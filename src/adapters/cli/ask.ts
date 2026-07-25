@@ -52,6 +52,8 @@ export interface RunAskOptions {
   maxSteps?: number;
   /** Run a self-critique pass before answering (default true). */
   verify?: boolean;
+  /** Plan first on multi-part questions (default true). */
+  plan?: boolean;
   /** Print each agent tool step. */
   verbose?: boolean;
   /** Injected in tests; built from env credentials otherwise. */
@@ -160,6 +162,7 @@ export async function runAsk(options: RunAskOptions): Promise<AskResult> {
         complete: ai.agentComplete,
         maxSteps: options.maxSteps,
         verify: options.verify ?? true,
+        plan: options.plan ?? true,
         onStep: options.verbose ? (step) => log(formatStep(step)) : undefined,
       });
 

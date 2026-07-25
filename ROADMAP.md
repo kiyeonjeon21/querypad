@@ -175,13 +175,15 @@ architecture, naming). The intended moat is **semantic-first + local-first**: an
 governed semantic model is reliable where naked text-to-SQL is not, and almost every funded
 competitor is cloud/warehouse-native.
 
-**Status of that claim, measured (2026-07-25, step 4.2):** the accuracy half is **not supported
-yet**. Against a `run_sql`-only control on the trap dataset, grounding moved the run pass rate by
-+2.8 points - well inside the noise floor - and the two arms disagreed on direction depending on the
-metric. What grounding *did* buy, unambiguously, is **efficiency**: 1.7 versus 4.3 mean tool steps, a
-~60% cut, on every single case. Treat "grounded is more accurate" as an open hypothesis needing a
-harder dataset, and "grounded is cheaper and more auditable" as measured fact. Build one step at a
-time:
+**Status of that claim, measured twice (steps 4.2 and 4.3):** it holds, but only once the data is
+hard enough to tell. On the original trap dataset grounding moved the run pass rate by +2.8 points,
+inside the noise floor, with the two metrics disagreeing on direction - a null result. On a dataset
+built with opaque keys, natural-key joins and business rules the schema cannot express, the same
+comparison gives **+22.2 points (80.6% vs 58.3%)** with both metrics agreeing, and the control's
+failures collapse to a single cause: it does not know the rules only a glossary carries.
+Efficiency held in both runs (**1.5 vs 4.5** mean tool steps here, ~60% fewer). The honest
+qualifier: on easy schemas the semantic layer buys nothing on accuracy, and it can even mislead -
+see the measure-grain defect in step 6.2. Build one step at a time:
 
 1. **Agentic `ask` loop** — self-correcting, tool-using. ✅ Built.
 2. **Semantic layer** — ✅ Built (all five sub-steps). (Research-settled architecture: structured YAML core → DuckDB hybrid
@@ -270,6 +272,28 @@ time:
       is recorded, not worked around. (b) The glossary chain is provably load-bearing: the hard
       engine suite scores 25/25 with `--glossary` and exactly the five `hard-term-*` cases fail
       without it, and a test asserts that.
+      **The A/B on this dataset discriminates.** Same configuration as before (12 cases,
+      repeat 3, verify on, maxSteps 12), validity checks clean (neither arm hit the turn budget;
+      both baseline controls 2/2 in both arms):
+
+      | | grounded | raw-sql |
+      |---|---|---|
+      | run pass rate | **29/36 (80.6%)** | 21/36 (58.3%) |
+      | strict cases | **9/12** | 6/12 |
+      | mean tool steps | **1.5** | 4.5 |
+
+      **+22.2 points**, and unlike the first dataset both metrics now agree in direction. The
+      raw-sql arm's failures share one root cause: it never excludes void invoices, so it
+      returns 11,275.50 / 1,297.50 / 2,535 / 1,128 where the answers are 10,944 / 1,020 /
+      2,257.50 / 1,074. That is a business rule the schema cannot express and only the glossary
+      carries, which is exactly what the semantic layer is for. Biggest gaps:
+      `hard-revenue-by-region` and `hard-top-customer` are 3/3 vs **0/3**.
+      **Two honest marks against it.** Grounding *lost* `hard-revenue-by-category` 0/3 vs 1/3
+      through the measure-grain defect above - the one case where being handed a measure was
+      worse than having none. And `hard-fanout-revenue-and-cases` is **0/3 in both arms**: both
+      agents write the naive double join and inflate one customer's revenue 4x (8,156 vs 2,039),
+      so grounding does not prevent fan-out once the agent leaves `query_metric` and hand-writes
+      SQL. Per `AGENTS.md` nothing was tuned after seeing these numbers.
 5. **MCP server** — ✅ Built. `querypad mcp` serves the read-only toolkit over stdio. The
    tools are not a reimplementation: `createDataToolkit` (`src/core/agent/toolkit.ts`) is
    the single definition that both the internal `ask` loop and the MCP server consume, so
@@ -287,7 +311,20 @@ time:
       dimensions **and** measures, so the table's real money measure disappears without a word.
       Candidate fix: require an FK target to look like a key (id-like name, or referenced by a
       name-similar column), or refuse targets that are themselves measures.
-   2. **Duplicate measure names resolve silently.** Two tables with an `amount` column both
+   2. **Measures have no grain, so naming one can actively mislead.** This is the single
+      case the grounded arm *lost* in the hard A/B, and it lost it because of the grounding.
+      The glossary names `inv.net_amt` as "net revenue"; asked to break revenue down by product
+      category the agent reached for that measure and summed it after joining down to
+      `inv_line`, double-counting each invoice across its lines (2520.5 instead of 1074 for
+      Software). The data is not ambiguous - line-level and header totals are both exactly
+      10,944 - so this is a real grain error, not a bad case. `SemanticMeasure` records
+      `agg` and `column` but nothing about the grain it is valid at, `query_metric` refuses
+      cross-grain joins only inside its own compiler, and `compile-metric.ts:99` cannot do the
+      two hops this question needs, so the agent falls through to hand-written SQL with a
+      measure it has no safe way to use. Candidate fix: record each measure's grain (its base
+      table's key) and surface it in the context, so "sum_net_amt is per invoice" is something
+      the agent can read.
+   3. **Duplicate measure names resolve silently.** Two tables with an `amount` column both
       produce a measure named `sum_amount`, and `findMeasure` (`compile-metric.ts:33`) returns the
       first by entity order. Same for duplicate dimension names, and `ensureJoin` matches on the
       table pair rather than the column, so two FKs into one target pick whichever edge sorts

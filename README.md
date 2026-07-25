@@ -245,19 +245,28 @@ actually worth anything? It runs a `grounded` arm (what ships) against a `raw-sq
 interleaved so API drift cannot masquerade as a result. The control is not crippled -
 `SHOW`/`DESCRIBE` are read-only, so it discovers the schema itself.
 
-The honest current answer, and the reason this suite exists:
+The answer depends entirely on how hard the data is, which is the most useful thing this
+suite has produced:
 
-| | grounded | raw-sql |
-|---|---|---|
-| run pass rate | 29/36 (80.6%) | 28/36 (77.8%) |
-| strict cases | 8/12 | 9/12 |
-| **mean tool steps** | **1.7** | **4.3** |
+| | dataset | grounded | raw-sql | delta |
+|---|---|---|---|---|
+| run pass rate | original | 29/36 (80.6%) | 28/36 (77.8%) | +2.8 |
+| run pass rate | **hard** | **29/36 (80.6%)** | **21/36 (58.3%)** | **+22.2** |
+| mean tool steps | hard | **1.5** | 4.5 | ~60% fewer |
 
-On **accuracy the grounding does not yet pay for itself** on this dataset: +2.8 points is
-inside the noise floor, the two metrics disagree on direction, and 8 of 12 cases pass 3/3 in
-*both* arms - a frontier model does not fall for a 7-table fan-out trap. On **efficiency it
-clearly does**: ~60% fewer exploration steps, on every case. Both numbers are printed with
-validity checks (turn-budget exhaustion, baseline controls) that must be read first.
+On the original 7-table dataset the grounding buys **nothing measurable on accuracy**: +2.8
+points is inside the noise floor, the two metrics disagree on direction, and 8 of 12 cases pass
+in both arms. A frontier model simply does not fall for a small fan-out trap.
+
+On the hard dataset it wins clearly, and for a legible reason: every one of the control arm's
+failures traces to the same thing - it does not exclude void invoices, a business rule the
+schema cannot express and only the glossary carries. Two cases go 3/3 versus **0/3**.
+
+Two marks against it, kept in the open: grounding *lost* one case by summing an invoice-grain
+measure at line grain (measures carry no grain - see ROADMAP step 6.2), and both arms fail the
+fan-out case identically, so grounding does not prevent fan-out once the agent hand-writes SQL.
+Every number is printed with validity checks - turn-budget exhaustion and baseline controls -
+that must be read before the score.
 
 ## `explain`: justify every join
 

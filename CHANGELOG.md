@@ -5,6 +5,30 @@ and public product updates.
 
 ## Unreleased
 
+### A harder trap dataset, and a moat claim that now holds
+
+- New `evals/dataset-hard/` (11 tables, deliberately bad naming) plus a committed glossary at
+  `evals/glossary-hard.json`. It exists because the first dataset stopped discriminating: 8 of
+  its 12 cases pass in *both* A/B arms
+- Traps were chosen against the engine's **measured** solvable envelope, not intuition. An FK is
+  only discoverable when it shares a token with `"<keyTable> <keyColumn>"`, so `cust_ref` and
+  `owner` were rejected - the engine cannot solve those either, so they would fail in both arms
+  and discriminate nothing
+- **The A/B now discriminates: grounded 29/36 runs (80.6%, 9/12 cases) vs raw-sql 21/36 (58.3%,
+  6/12), a +22.2 point delta with both metrics agreeing in direction**, versus +2.8 and
+  disagreeing on the original dataset. Mean tool steps 1.5 vs 4.5. Validity checks clean:
+  neither arm hit the turn budget, both baseline controls passed in both arms
+- Every one of the control arm's failures has the same cause - it does not exclude void
+  invoices - which is exactly the kind of rule a schema cannot express and a glossary can
+- Two results kept in the open rather than tuned away: grounding **lost** `revenue-by-category`
+  0/3 vs 1/3 by summing an invoice-grain measure at line grain, and both arms fail the fan-out
+  case identically (8,156 vs 2,039), so grounding does not prevent fan-out once the agent
+  hand-writes SQL instead of using `query_metric`
+- `eval:engine:hard` is 25/25 and gates CI. Drop `--glossary` and exactly the five term cases
+  fail, which a test asserts - the enrichment chain cannot silently rot
+- Every `expectedSql` was verified against the CSVs before being committed, and a test re-runs
+  all twelve so ground truth cannot drift
+
 ### Enrichment now reaches the agent and the resolver (bug fix)
 
 - `enrich --apply` wrote descriptions and synonyms that **nothing ever read back**: there was no

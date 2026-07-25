@@ -5,7 +5,7 @@ Thanks for your interest in contributing to QueryPad!
 ## Development Setup
 
 ```bash
-git clone https://github.com/vericontext/querypad.git
+git clone https://github.com/kiyeonjeon21/querypad.git
 cd querypad
 npm install
 npm run querypad -- inspect ./fixtures/data
@@ -65,7 +65,7 @@ npm run build && npm link   # install a real `querypad` binary from dist/
 
 ## Reporting Issues
 
-- Use [GitHub Issues](https://github.com/vericontext/querypad/issues)
+- Use [GitHub Issues](https://github.com/kiyeonjeon21/querypad/issues)
 - Include steps to reproduce, expected behavior, and actual behavior
 
 ## License

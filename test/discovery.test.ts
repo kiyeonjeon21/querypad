@@ -175,3 +175,37 @@ test("a price column is not a join target, so its measure survives", async () =>
     db.close();
   }
 });
+
+test("colliding measure names are table-qualified on every side", async () => {
+  const { buildSemanticModel } = await import("../src/core/discovery/semantic-model");
+  const { buildTermCatalog } = await import("../src/core/discovery/term-catalog");
+  const { mkdtemp, writeFile } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { resolveSource } = await import("../src/adapters/cli/source");
+
+  const dir = await mkdtemp(path.join(tmpdir(), "querypad-dupe-measure-"));
+  // Two unrelated tables that both have an `amount` column.
+  await writeFile(path.join(dir, "sales.csv"), "id,amount\n1,10.0\n2,20.0\n");
+  await writeFile(path.join(dir, "refunds.csv"), "id,amount\n1,5.0\n2,7.0\n");
+
+  const db = await createNodeDb();
+  try {
+    const { tables } = await resolveSource({ folder: dir }).load(db.runner);
+    const profiles = await Promise.all(tables.map((t) => profileTable(t, db.runner, 1)));
+    const model = buildSemanticModel(tables.map((t) => t.name), [], 1, profiles);
+
+    const names = model.entities.flatMap((e) => e.measures.map((m) => m.name));
+    assert.equal(new Set(names).size, names.length, `measure names must be unique, got ${names}`);
+    // Both sides are qualified, so the result never depends on table order.
+    assert.ok(names.includes("sales_sum_amount"), names.join(","));
+    assert.ok(names.includes("refunds_sum_amount"), names.join(","));
+    assert.ok(!names.includes("sum_amount"), "the bare colliding name must not survive");
+
+    // The catalog is keyed by term, so duplicates there were unresolvable by a user.
+    const catalog = buildTermCatalog(model);
+    const measureTerms = catalog.filter((e) => e.kind === "measure").map((e) => e.term);
+    assert.equal(new Set(measureTerms).size, measureTerms.length);
+  } finally {
+    db.close();
+  }
+});

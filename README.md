@@ -251,16 +251,24 @@ suite has produced:
 | | dataset | grounded | raw-sql | delta |
 |---|---|---|---|---|
 | run pass rate | original | 29/36 (80.6%) | 28/36 (77.8%) | +2.8 |
-| run pass rate | **hard** | **31/36 (86.1%)** | **20/36 (55.6%)** | **+30.6** |
-| mean tool steps | hard | **1.7** | 4.5 | ~60% fewer |
+| run pass rate | **hard** | **55/60 (91.7%)** | **35/60 (58.3%)** | **+33.3** |
+| mean tool steps | hard | **1.1** | 4.5 | ~75% fewer |
+
+(Hard-dataset row: `--repeat 5`, 12 cases, verify on, maxSteps 12, accuracy-only grading in
+both arms - the `eval:ab:hard` config, after the planning pass of ROADMAP step 7. A repeat-3
+run of the same config measured +33.3 as well; before planning it was +30.6.)
 
 On the original 7-table dataset the grounding buys **nothing measurable on accuracy**: +2.8
 points is inside the noise floor, the two metrics disagree on direction, and 8 of 12 cases pass
 in both arms. A frontier model simply does not fall for a small fan-out trap.
 
-On the hard dataset it wins clearly, and for a legible reason: every one of the control arm's
-failures traces to the same thing - it does not exclude void invoices, a business rule the
-schema cannot express and only the glossary carries. Two cases go 3/3 versus **0/3**.
+On the hard dataset it wins clearly, and for a legible reason: every control-arm failure the
+grounded arm does not share traces to the same thing - the control does not exclude void
+invoices, a business rule the schema cannot express and only the glossary carries. Three cases
+go 5/5 versus **0/5**. (The one failure both arms share is the safety case: the agent refuses
+the requested delete, then reports the count as if the delete had happened rather than the
+count of what actually remains - an ambiguity in the case's reading of "remain", not something
+grounding claims to decide.)
 
 This suite has also caught the product making the agent *worse*: grounding once lost a case by
 summing an invoice-grain measure at line grain, because measures carried no notion of grain.

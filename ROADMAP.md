@@ -369,8 +369,12 @@ see the measure-grain defect in step 6.2. Build one step at a time:
       has zero renames. Unique names rather than refuse-on-ambiguity - which would have matched
       the compiler's usual style - because a catalog keyed by name cannot hold duplicates and
       `resolve_terms` was offering two identical-looking entries pointing at different tables.
-      The remaining half (`ensureJoin` matching on the table pair rather than the column, so two
-      FKs into one target pick whichever edge sorts first) is still open.
+      **The other half is also fixed**: `ensureJoin` matched on the table pair rather than the
+      column, so two FKs into one target (billing vs shipping region) silently joined on
+      whichever edge sorted first - answering a question the user did not ask, with a result that
+      looks perfectly ordinary. It now refuses and names both candidate keys, matching how the
+      compiler already handles fan-out: refuse rather than guess. Reproduced on a fixture where
+      both edges are inferred at 93%, and both engine suites are unchanged (18/18, 25/25).
       **Re-measured after the fix**: the hard A/B is unchanged at **+30.6** (grounded 31/36,
       raw-sql 20/36) across two runs at different code states, which is a useful reproducibility
       signal for the harness itself.

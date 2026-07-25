@@ -221,6 +221,9 @@ test("agent suite --repeat fails the case if any run fails", async () => {
   const report = await runAgentSuite({
     only: ["simple-count"],
     repeat: 3,
+    // verify off: this test exercises --repeat plumbing, and keying the wrong run
+    // off the call counter needs a fixed two calls per run (tool + finalize).
+    verify: false,
     complete: scriptedAgent(() => {
       call += 1;
       // Correct on runs 1 and 3, wrong on run 2 — models are not deterministic.

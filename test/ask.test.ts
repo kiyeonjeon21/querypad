@@ -4,7 +4,11 @@ import { isReadOnlyQuery, stripSqlFences } from "../src/core/discovery/sql-safet
 import { buildAskContext } from "../src/core/agent/ask-context";
 import { parseFollowups, runAsk, type AskAi } from "../src/adapters/cli/ask";
 import { resolveSource } from "../src/adapters/cli/source";
-import type { AgentComplete } from "../src/core/agent/loop";
+import {
+  buildVerificationTurn,
+  VERIFICATION_PROMPT,
+  type AgentComplete,
+} from "../src/core/agent/loop";
 import type { ToolCompletion } from "../src/ai/complete";
 import type { Relationship } from "../src/core/types/discovery";
 
@@ -278,4 +282,79 @@ test("agent mode is skipped when the AI has no agentComplete (single-shot fallba
   });
   assert.equal(result.agent, null);
   assert.equal(result.result?.rows.length, 1);
+});
+
+// ---- Verification pass (self-critique before answering) -----------------------
+
+const OVER_PROJECTED = "SELECT plan, COUNT(*) AS n, MIN(id) AS extra FROM users GROUP BY plan";
+const RIGHT_SHAPE = "SELECT plan, COUNT(*) AS n FROM users GROUP BY plan";
+
+test("verify sends an over-projected answer back and accepts the corrected shape", async () => {
+  const result = await runAsk({
+    question: "how many users are on each plan",
+    source: resolveSource({ folder: "fixtures/data" }),
+    // verify defaults on: the model finalizes a 3-column result, the checklist
+    // sends it back, and it re-runs with the 2-column shape the question asked for.
+    ai: agentAi([
+      toolUse("t1", "run_sql", { query: OVER_PROJECTED }),
+      textReply("Here is the breakdown by plan."),
+      toolUse("t2", "run_sql", { query: RIGHT_SHAPE }),
+      textReply("Users per plan."),
+    ]),
+    log: () => {},
+  });
+
+  // Both queries ran — proof the verify turn drove a correction, not just a restate.
+  assert.deepEqual(result.agent?.sqlHistory, [OVER_PROJECTED, RIGHT_SHAPE]);
+  assert.equal(result.result?.columns.length, 2);
+  assert.equal(result.agent?.answer, "Users per plan.");
+});
+
+test("verify leaves a correct answer intact and adds no tool step", async () => {
+  const result = await runAsk({
+    question: "how many users are on each plan",
+    source: resolveSource({ folder: "fixtures/data" }),
+    ai: agentAi([
+      toolUse("t1", "run_sql", { query: RIGHT_SHAPE }),
+      textReply("Users per plan."),
+      // If verify wrongly re-ran a tool, this would fire; the restate above wins.
+      textReply("Users per plan."),
+    ]),
+    log: () => {},
+  });
+
+  assert.deepEqual(result.agent?.sqlHistory, [RIGHT_SHAPE]);
+  assert.equal(result.agent?.steps.length, 1);
+  assert.equal(result.agent?.answer, "Users per plan.");
+});
+
+test("verify off returns on first finalization (no self-critique turn)", async () => {
+  const result = await runAsk({
+    question: "how many users are on each plan",
+    source: resolveSource({ folder: "fixtures/data" }),
+    verify: false,
+    ai: agentAi([
+      toolUse("t1", "run_sql", { query: RIGHT_SHAPE }),
+      textReply("Users per plan."),
+      // Reached only if a verify turn fired — it must not.
+      toolUse("t2", "run_sql", { query: OVER_PROJECTED }),
+    ]),
+    log: () => {},
+  });
+
+  assert.deepEqual(result.agent?.sqlHistory, [RIGHT_SHAPE]);
+  assert.equal(result.result?.columns.length, 2);
+});
+
+test("buildVerificationTurn adds a safety note only for data-modification questions", () => {
+  const safe = buildVerificationTurn("Delete every starter-plan customer, then tell me how many remain.");
+  assert.ok(safe.includes("data-modification"));
+  assert.ok(safe.includes(VERIFICATION_PROMPT));
+
+  const plain = buildVerificationTurn("How many customers are there?");
+  assert.equal(plain, VERIFICATION_PROMPT);
+
+  // The checklist always carries the projection and ranking checks.
+  assert.ok(plain.includes("Projection"));
+  assert.ok(plain.includes("Ranking"));
 });

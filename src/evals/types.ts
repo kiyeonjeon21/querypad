@@ -86,6 +86,7 @@ export interface SuiteConfig {
   arm: string;
   repeat: number;
   verify: boolean;
+  plan: boolean;
   behavioral: boolean;
   maxSteps: number;
   tools: string[];

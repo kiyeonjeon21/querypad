@@ -26,6 +26,48 @@ Guidance:
 const WRITE_VERB = /\b(delete|drop|truncate|update|insert|alter|remove)\b/i;
 
 /**
+ * Questions that ask for a second quantity or a second instruction. Deliberately
+ * narrow: it is the trigger for spending an extra model turn, so a false negative
+ * costs nothing (the agent proceeds as before) while a false positive costs a turn
+ * on every question. Derived from observed failures, not from intuition - a bare
+ * "and" would fire on "give the customer name and the amount", which is one
+ * quantity with two columns and already answered correctly.
+ */
+const MULTI_PART =
+  /\bthen\b|\band how many\b|\band their\b|\band the (number|count)\b|\balong with\b|\bas well as\b/i;
+
+/**
+ * Plan-first turn for a question that asks for more than one thing. The failure it
+ * targets is specific and measured: asked for revenue *and* ticket counts per
+ * customer, the agent writes a single query joining both children of the same
+ * parent and silently multiplies the rows - returning 3405 for a customer whose
+ * revenue is 1702.50, because that customer has two tickets.
+ *
+ * Note the last line. Our grader compares one result set, and more importantly the
+ * question genuinely asks for one table, so a plan that splits the work into two
+ * separate answers would be wrong for the user as well as unscoreable.
+ */
+export const PLANNING_PROMPT = `Before running anything, write a short plan (2 lines at most):
+1. List each quantity the question asks for, and which table each one comes from.
+2. If two quantities come from different tables that both hang off the same parent, joining them in one query repeats rows and inflates the totals. Compute each at its own grain - a subquery or CTE per quantity - then combine.
+Then carry out the plan and return a single result set that answers the whole question.`;
+
+/**
+ * The planning turn for a question, or null when the extra turn would buy nothing.
+ * Pure — unit-tested without the network.
+ *
+ * Data-modification questions are deliberately excluded even though they read as
+ * multi-part. Measured: planning them made things worse, turning a wrong number into
+ * a blank refusal — the over-refusal failure the verification pass exists to prevent.
+ * Their failure was never decomposition (the agent already separates the parts), so
+ * safety stays verification's job and planning stays decomposition's.
+ */
+export function buildPlanningTurn(question: string): string | null {
+  if (WRITE_VERB.test(question)) return null;
+  return MULTI_PART.test(question) ? PLANNING_PROMPT : null;
+}
+
+/**
  * Self-critique checklist injected once before the agent finalizes. Targets the
  * mistakes a naive agent makes: over-projecting columns, ignoring ranking words,
  * and over-refusing a prompt that mixes a write instruction with a readable one.
@@ -102,6 +144,11 @@ export interface RunAgentQueryOptions {
   maxSteps?: number;
   /** Run one self-critique turn before accepting the final answer (default false). */
   verify?: boolean;
+  /**
+   * Write a plan first, but only for questions that ask for more than one thing
+   * (default false). Costs one model turn when it fires and nothing when it does not.
+   */
+  plan?: boolean;
   /** Restrict the agent to these tool names (default: the whole toolkit). */
   tools?: string[];
   /**
@@ -118,6 +165,17 @@ function textFrom(content: ContentBlock[]): string {
     .map((block) => block.text)
     .join("")
     .trim();
+}
+
+/**
+ * Trim text blocks and drop empties. The API rejects an assistant message whose final
+ * text block ends in whitespace, which a model writing a bulleted plan does routinely.
+ */
+function trimTextBlocks(content: ContentBlock[]): ContentBlock[] {
+  const isText = (b: ContentBlock): b is { type: "text"; text: string } => b.type === "text";
+  return content
+    .map((block) => (isText(block) ? { ...block, text: block.text.trim() } : block))
+    .filter((block) => !isText(block) || block.text.length > 0);
 }
 
 function toolUsesFrom(content: ContentBlock[]): ToolUseBlock[] {
@@ -152,6 +210,29 @@ export async function runAgentQuery(options: RunAgentQueryOptions): Promise<Agen
   });
 
   const messages: ChatMessage[] = [{ role: "user", content: question }];
+
+  // Plan first, with no tools available, so the model has to commit to an approach in
+  // writing before it can act. A warning in the grounding context was not enough: the
+  // context already says which joins repeat rows, and the agent still wrote the
+  // double-counting query in a single confident step.
+  if (options.plan) {
+    const planPrompt = buildPlanningTurn(question);
+    if (planPrompt) {
+      messages.push({ role: "user", content: planPrompt });
+      const { content } = await complete({ system, messages, tools: [] });
+      // Trailing whitespace on a final assistant block is rejected by the API, and a
+      // transcript may not end on an assistant turn — so trim, then hand the turn back.
+      messages.push({ role: "assistant", content: trimTextBlocks(content) });
+      // Be explicit that the plan is not the answer. Left at "now carry out that plan",
+      // the model finalized on the plan alone in 2 of 5 runs and returned no rows at all.
+      messages.push({
+        role: "user",
+        content:
+          "Now carry out that plan with the tools. You have not answered yet: run the query and " +
+          "return the actual rows before giving your finding.",
+      });
+    }
+  }
 
   for (let turn = 0; turn < maxSteps; turn += 1) {
     const { content } = await complete({ system, messages, tools: toolkit.definitions });

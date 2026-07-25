@@ -5,6 +5,24 @@ and public product updates.
 
 ## Unreleased
 
+### Plan-first turn for multi-part questions
+
+- Asked for revenue *and* ticket counts per customer, the agent wrote one query joining both
+  children of the same parent and silently multiplied the rows, returning 3,405 for a customer
+  whose revenue is 1,702.50. A warning in the grounding context did not prevent it - the agent
+  wrote one confident query in a single step - so the fix is a turn with **no tools offered**,
+  forcing it to commit to an approach in writing first
+- The trigger is deliberately narrow: a false negative costs nothing, a false positive spends a
+  turn on every question. Data-modification questions are excluded outright, because planning
+  them measured *worse* - it turned a wrong number into a blank refusal. Safety stays the
+  verification pass's job
+- **Measured**: 1/8 runs without planning, 8/8 with, on the one case in either suite that
+  triggers it. The hard A/B moved +30.6 to +33.3 - close to one noise unit, and necessarily so,
+  since planning fires on 1 of 12 cases and could move the aggregate by at most 8.3 points. The
+  case-level result is strong; the suite-level result is not, and both are reported
+- `--no-plan` disables it, and a test asserts a non-triggering question takes a byte-identical
+  path, so the feature is provably free when it does not apply
+
 ### Measure names are unique, and the fan-out case is gradeable (bug fix)
 
 - Two tables with the same numeric column produced the same measure name, and the metric compiler

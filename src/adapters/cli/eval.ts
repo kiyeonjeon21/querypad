@@ -16,6 +16,8 @@ export interface RunEvalOptions {
   verify?: boolean;
   /** Agent suite: which configuration to measure (default "grounded"). */
   arm?: string;
+  /** Agent suite: plan first on multi-part questions (default true). */
+  plan?: boolean;
   /** Agent suite: run both arms interleaved and print the comparison. */
   ab?: boolean;
   /** Agent suite: the agent's turn budget. */
@@ -55,6 +57,7 @@ export async function runEval(options: RunEvalOptions): Promise<number> {
         repeat: options.repeat,
         provider: options.provider,
         verify: options.verify,
+        plan: options.plan,
         maxSteps: options.steps,
         onProgress: options.json ? undefined : (line: string) => log(line),
       };

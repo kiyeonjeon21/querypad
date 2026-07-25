@@ -5,6 +5,7 @@ import { buildAskContext } from "../src/core/agent/ask-context";
 import { parseFollowups, runAsk, type AskAi } from "../src/adapters/cli/ask";
 import { resolveSource } from "../src/adapters/cli/source";
 import {
+  buildPlanningTurn,
   buildVerificationTurn,
   VERIFICATION_PROMPT,
   type AgentComplete,
@@ -357,4 +358,120 @@ test("buildVerificationTurn adds a safety note only for data-modification questi
   // The checklist always carries the projection and ranking checks.
   assert.ok(plain.includes("Projection"));
   assert.ok(plain.includes("Ranking"));
+});
+
+// ---- Planning pass (multi-part questions) --------------------------------------
+
+test("buildPlanningTurn fires only for questions asking for more than one thing", () => {
+  // The two shapes measured as failing: a second quantity, and a second instruction.
+  assert.ok(
+    buildPlanningTurn("show the customer name, their net revenue, and how many cases they opened")
+  );
+  // A write instruction reads as multi-part but is excluded on purpose: planning it
+  // measured worse, turning a wrong number into a blank refusal. Safety is the
+  // verification pass's job.
+  assert.equal(buildPlanningTurn("Delete every void invoice, then tell me how many remain."), null);
+  assert.ok(buildPlanningTurn("Count the open invoices, then show revenue per region."));
+
+  // Single-quantity questions must not pay for a turn. The third is the important
+  // one: "and the amount" is one quantity split over two columns, and it already
+  // answers correctly - a bare "and" trigger would have fired on it.
+  assert.equal(buildPlanningTurn("How many customers are there?"), null);
+  assert.equal(buildPlanningTurn("Break down net revenue by product category name."), null);
+  assert.equal(
+    buildPlanningTurn("Which single customer has the highest net revenue? Give the name and the amount."),
+    null
+  );
+});
+
+test("planning adds a tool-free turn before acting, only when it fires", async () => {
+  const seen: { tools: number; last: string }[] = [];
+  const spy = (script: ToolCompletion[]): AgentComplete => {
+    let i = 0;
+    return async ({ messages, tools }) => {
+      const last = messages[messages.length - 1];
+      seen.push({
+        tools: tools.length,
+        last: typeof last.content === "string" ? last.content : "[blocks]",
+      });
+      return script[Math.min(i++, script.length - 1)];
+    };
+  };
+
+  const multiPart = "show each customer's revenue and how many cases they opened";
+  await runAsk({
+    question: multiPart,
+    source: resolveSource({ folder: "fixtures/data" }),
+    ai: agentAi([], { agentComplete: spy([textReply("plan"), textReply("done")]) }),
+    log: () => {},
+  });
+
+  // The first call is the planning turn: no tools offered, so the model must answer
+  // in prose, and the prompt it sees is the planning instruction.
+  assert.equal(seen[0].tools, 0, "planning turn must offer no tools");
+  assert.match(seen[0].last, /write a short plan/i);
+  // The turns that follow are the normal loop, with the toolkit back.
+  assert.ok(seen[1].tools > 0, "the loop must run with tools after planning");
+
+  seen.length = 0;
+  await runAsk({
+    question: "how many users are there",
+    source: resolveSource({ folder: "fixtures/data" }),
+    ai: agentAi([], { agentComplete: spy([textReply("done")]) }),
+    log: () => {},
+  });
+  assert.ok(seen[0].tools > 0, "a single-part question must not spend a planning turn");
+});
+
+test("planning can be turned off for a question that would otherwise fire", async () => {
+  const toolCounts: number[] = [];
+  const complete: AgentComplete = async ({ tools }) => {
+    toolCounts.push(tools.length);
+    return textReply("done");
+  };
+
+  await runAsk({
+    question: "show revenue and how many cases each customer opened",
+    source: resolveSource({ folder: "fixtures/data" }),
+    plan: false,
+    ai: agentAi([], { agentComplete: complete }),
+    log: () => {},
+  });
+  assert.ok(toolCounts[0] > 0, "with --no-plan the first turn is the normal loop");
+});
+
+test("a question that does not trigger planning takes a byte-identical path", async () => {
+  // Planning must be free when it does not fire. This is what lets a suite score be
+  // reasoned about case by case: any case whose question does not match the trigger
+  // cannot have been affected by the feature.
+  const record = (): { complete: AgentComplete; calls: unknown[] } => {
+    const calls: unknown[] = [];
+    return {
+      calls,
+      complete: async ({ system, messages, tools }) => {
+        calls.push({ system, messages: JSON.parse(JSON.stringify(messages)), tools: tools.length });
+        return textReply("done");
+      },
+    };
+  };
+
+  const on = record();
+  await runAsk({
+    question: "Break down net revenue by product category name.",
+    source: resolveSource({ folder: "fixtures/data" }),
+    plan: true,
+    ai: agentAi([], { agentComplete: on.complete }),
+    log: () => {},
+  });
+
+  const off = record();
+  await runAsk({
+    question: "Break down net revenue by product category name.",
+    source: resolveSource({ folder: "fixtures/data" }),
+    plan: false,
+    ai: agentAi([], { agentComplete: off.complete }),
+    log: () => {},
+  });
+
+  assert.deepEqual(on.calls, off.calls);
 });

@@ -32,8 +32,8 @@ Usage:
                                    (needs a key) against evals/cases/. --json for raw output;
                                    agent accepts --cases <id,…>, --repeat <n>, --steps <n>,
                                    --no-verify (baseline with the self-critique pass off),
-                                   --arm <grounded|raw-sql>, and --ab (run both arms
-                                   interleaved and print the grounding comparison).
+                                   --arm <grounded|raw-sql>, --no-plan, and --ab (run
+                                   both arms interleaved and print the comparison).
                                    Both suites accept --dataset <folder>, --cases-file <path>
                                    and --glossary <path> to score a different dataset.
   querypad help                    Show this help
@@ -56,6 +56,8 @@ Options for ask:
   --no-verify                      Skip the self-critique pass (on by default:
                                    the agent re-checks projection/ranking/safety
                                    before answering)
+  --no-plan                        Skip the plan-first turn (on by default, and only
+                                   fires for questions asking for more than one thing)
   --verbose                        Print each agent tool step
 
 Environment: ANTHROPIC_API_KEY or OPENAI_API_KEY for the chosen provider.
@@ -142,6 +144,7 @@ async function main(argv: string[]): Promise<number> {
         showSql: flags["show-sql"] === true,
         maxSteps: steps && Number.isFinite(steps) ? steps : undefined,
         verify: flags["no-verify"] !== true,
+        plan: flags["no-plan"] !== true,
         verbose: flags.verbose === true,
       });
       return 0;
@@ -193,6 +196,7 @@ async function main(argv: string[]): Promise<number> {
         repeat: repeat && Number.isFinite(repeat) ? repeat : undefined,
         provider: stringFlag(flags, "provider"),
         verify: flags["no-verify"] !== true,
+        plan: flags["no-plan"] !== true,
         arm: stringFlag(flags, "arm"),
         ab: flags.ab === true,
         dataset: stringFlag(flags, "dataset"),

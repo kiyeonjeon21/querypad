@@ -5,6 +5,15 @@ and public product updates.
 
 ## Unreleased
 
+### `querypad mcp-attach <socket>` - join an app-hosted MCP conversation
+
+- A byte-for-byte stdio-to-Unix-socket bridge, so a stdio MCP client (Claude Code) can join a
+  conversation the desktop app hosts on a socket it owns. The app spawns `querypad mcp` over
+  stdio, listens on the socket, and proxies frames between the two - which puts every tool call
+  and result set in its hands to drive native panels. The engine itself is unchanged
+- Deliberately dumb: no framing, no parsing, no policy. The app and the engine own the
+  protocol; this is a wire
+
 ### An ambiguous join is refused instead of guessed (bug fix)
 
 - `ensureJoin` matched on the table pair rather than the column, so a table with two foreign keys

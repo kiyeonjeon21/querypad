@@ -28,6 +28,9 @@ Usage:
                                    tools (describe_dataset, list_tables, describe_table,
                                    sample_table, resolve_terms, query_metric, run_sql) to
                                    Claude Code / Cursor. Accepts --db/--schema/--out too.
+  querypad mcp-attach <socket>     Bridge stdio to a Unix socket hosting an MCP server -
+                                   how Claude Code joins a conversation the desktop app
+                                   hosts (and observes) on a socket it owns.
   querypad eval <engine|agent>     Score the engine (deterministic, no API key) or the agent
                                    (needs a key) against evals/cases/. --json for raw output;
                                    agent accepts --cases <id,…>, --repeat <n>, --steps <n>,
@@ -204,6 +207,17 @@ async function main(argv: string[]): Promise<number> {
         glossary: stringFlag(flags, "glossary"),
         steps: evalSteps && Number.isFinite(evalSteps) ? evalSteps : undefined,
       });
+    }
+    case "mcp-attach": {
+      const { positionals } = parseArgs(rest);
+      const socketPath = positionals[0];
+      if (!socketPath) {
+        console.error("Usage: querypad mcp-attach <socket-path>\n");
+        console.error(HELP);
+        return 1;
+      }
+      const { runMcpAttach } = await import("./mcp-attach");
+      return runMcpAttach(socketPath);
     }
     case "mcp": {
       const { positionals, flags } = parseArgs(rest);

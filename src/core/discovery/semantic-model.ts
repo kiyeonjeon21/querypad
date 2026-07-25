@@ -129,12 +129,14 @@ function enrichEntity(
 ): { dimensions: SemanticDimension[]; measures: SemanticMeasure[] } {
   const keys = keyColumns(table, relationships);
   const dimensions: SemanticDimension[] = [];
-  const measures: SemanticMeasure[] = [{ name: `${table}_count`, agg: "count" }];
+  // Every measure is valid at one row per this table; carrying that explicitly is
+  // what lets the agent see when a join would double-count it.
+  const measures: SemanticMeasure[] = [{ name: `${table}_count`, agg: "count", grain: table }];
 
   for (const col of profile.columns) {
     if (keys.has(col.name) || isIdLike(col.name, table)) continue;
     if (col.kind === "numeric") {
-      measures.push({ name: `sum_${col.name}`, agg: "sum", column: col.name });
+      measures.push({ name: `sum_${col.name}`, agg: "sum", column: col.name, grain: table });
       continue;
     }
     const dim = dimensionFor(col, profile.rowCount);

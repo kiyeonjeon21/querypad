@@ -264,3 +264,46 @@ test("prepareDataset applies glossary.json as curation, like verdicts.json", asy
     db.close();
   }
 });
+
+// ---- measure grain -------------------------------------------------------------
+
+test("measures carry the grain they are valid at, and the context warns about it", async () => {
+  const { buildSemanticModel } = await import("../src/core/discovery/semantic-model");
+  const { buildAskContext } = await import("../src/core/agent/ask-context");
+  const { createNodeDb } = await import("../src/engine/duckdb/connection");
+  const { resolveSource } = await import("../src/adapters/cli/source");
+  const { profileTable } = await import("../src/engine/duckdb/profile");
+  const { discoverRelationships } = await import("../src/core/discovery/relationships");
+
+  const dir = await mkdtemp(path.join(tmpdir(), "querypad-grain-"));
+  await writeFile(path.join(dir, "orders.csv"), "id,total\n1,100.0\n2,250.0\n3,75.0\n");
+  await writeFile(
+    path.join(dir, "order_lines.csv"),
+    "id,order_id,qty\n1,1,2\n2,1,3\n3,2,1\n4,3,5\n5,3,1\n"
+  );
+
+  const db = await createNodeDb();
+  try {
+    const { tables } = await resolveSource({ folder: dir }).load(db.runner);
+    const profiles = await Promise.all(tables.map((t) => profileTable(t, db.runner, 1)));
+    const rels = await discoverRelationships(profiles, db.runner);
+    const model = buildSemanticModel(tables.map((t) => t.name), rels, 1, profiles);
+
+    const orders = model.entities.find((e) => e.table === "orders")!;
+    const total = orders.measures.find((m) => m.column === "total");
+    assert.equal(total?.grain, "orders", "a measure is one value per its own table's row");
+    assert.equal(orders.measures.find((m) => m.agg === "count")?.grain, "orders");
+
+    // The warning must name the child that would repeat the rows: summing orders.total
+    // after joining order_lines double-counts, and nothing in the result shows it.
+    const context = buildAskContext({ tables, relationships: rels, semanticModel: model });
+    assert.match(context, /measures are per orders row/);
+    assert.match(context, /joining OrderLine repeats each orders row/);
+
+    // A leaf entity has no has_many, so it gets no warning to ignore.
+    const lines = model.entities.find((e) => e.table === "order_lines")!;
+    assert.equal(lines.hasMany.length, 0);
+  } finally {
+    db.close();
+  }
+});

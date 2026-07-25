@@ -39,7 +39,7 @@ Layer 4  AI Analyst          →  question → semantic model → SQL → execut
 | AI Verification | `.datactx/verdicts.json`: reject/override inferred joins; honored by inspect/ask/explain | ✅ Built (CLI) |
 | External databases | `--db` attaches Postgres/MySQL/SQLite read-only; tables become pushdown views | ✅ Built |
 | MCP server | `querypad mcp` exposes the read-only toolkit over stdio to Claude Code / Cursor | ✅ Built |
-| Eval harness | `querypad eval engine\|agent` scores both layers against a committed trap dataset | ✅ Built |
+| Eval harness | `querypad eval engine\|agent` scores both layers against a committed trap dataset; `--ab` measures grounded vs raw-SQL | ✅ Built |
 
 ## Built today
 
@@ -171,9 +171,17 @@ Question → grounded in relationships → agent loop { list/describe/sample →
 ## Next — deepening the agent
 
 Direction set from late-2025/2026 market research (competitive landscape, agentic
-architecture, naming). The moat is **semantic-first + local-first**: an agent grounded in a
+architecture, naming). The intended moat is **semantic-first + local-first**: an agent grounded in a
 governed semantic model is reliable where naked text-to-SQL is not, and almost every funded
-competitor is cloud/warehouse-native. Build one step at a time:
+competitor is cloud/warehouse-native.
+
+**Status of that claim, measured (2026-07-25, step 4.2):** the accuracy half is **not supported
+yet**. Against a `run_sql`-only control on the trap dataset, grounding moved the run pass rate by
++2.8 points - well inside the noise floor - and the two arms disagreed on direction depending on the
+metric. What grounding *did* buy, unambiguously, is **efficiency**: 1.7 versus 4.3 mean tool steps, a
+~60% cut, on every single case. Treat "grounded is more accurate" as an open hypothesis needing a
+harder dataset, and "grounded is cheaper and more auditable" as measured fact. Build one step at a
+time:
 
 1. **Agentic `ask` loop** — self-correcting, tool-using. ✅ Built.
 2. **Semantic layer** — ✅ Built (all five sub-steps). (Research-settled architecture: structured YAML core → DuckDB hybrid
@@ -214,6 +222,32 @@ competitor is cloud/warehouse-native. Build one step at a time:
       safety trap went from a full refusal (0 rows) to correctly refusing the write while still
       returning the true unmodified count. The remaining gaps (a ranking case, occasional
       over-projection) are wording levers the harness now makes visible, not open questions.
+   2. **Grounding A/B** - ✅ Built (`eval agent --ab`, `src/evals/arms.ts`). Tests the claim the
+      whole product rests on by running two arms over the same 12 cases, interleaved case by case:
+      `grounded` (the zero-override arm, so it is the shipped path) versus `raw-sql` (`run_sql`
+      only, no grounding context - not crippled, since SHOW/DESCRIBE let it discover the schema
+      itself). Accuracy is graded identically for both; behavioral assertions are off for both, or
+      the arm under test would carry the harder rubric.
+      **Configuration**: 12 cases, repeat 3, verify on, maxSteps 12, Sonnet at default temperature.
+      **Validity**: neither arm hit the turn budget on any case, and the two `baseline` control
+      cases passed 3/3 in both arms - so the control was working, not broken.
+      **Result - the accuracy claim did not survive**: grounded 29/36 runs (80.6%, 8/12 cases)
+      versus raw-sql 28/36 (77.8%, 9/12 cases). A +2.8 point run-rate delta is far inside the
+      ~14-point noise floor at this sample size, and the arms disagree on direction by metric
+      (grounded wins on runs, loses on strict cases) - the signature of a null result, not a win.
+      8 of the 12 cases went 3/3 in **both** arms, including the fan-out, multi-hop, distinct and
+      null-join traps: this model tier simply does not fall for them on a 7-table schema, with or
+      without a semantic model.
+      **Result - efficiency is a real, large win**: 1.7 versus 4.3 mean tool steps, lower in every
+      single case. Grounding removes roughly 60% of the exploration.
+      **One honest anti-result**: on `orders-by-shipping-region` grounding *hurt* (1/3 versus 3/3).
+      The grounded arm sampled `regions`, saw `country`, and grouped by it - more context created
+      more over-projection temptation, while the `run_sql`-only arm wrote the tighter query.
+      **What this changes**: the failures left in both arms are the known projection and ranking
+      gaps (`top-product-by-revenue`, `synonym-gap`), not grounding gaps - so the next accuracy
+      lever is the verification checklist, not more semantic layer. And the trap dataset needs to
+      get harder (more tables, worse names, genuinely ambiguous domains) before it can discriminate
+      accuracy at this model tier. Per `AGENTS.md` nothing was tuned to improve the number.
 5. **MCP server** — ✅ Built. `querypad mcp` serves the read-only toolkit over stdio. The
    tools are not a reimplementation: `createDataToolkit` (`src/core/agent/toolkit.ts`) is
    the single definition that both the internal `ask` loop and the MCP server consume, so

@@ -350,13 +350,30 @@ see the measure-grain defect in step 6.2. Build one step at a time:
       attention cannot be ruled out at n=3. (b) `hard-fanout-revenue-and-cases` now fails on
       `column count 1, expected 2`: the agent answers the two-part question with two separate
       queries and the row grader only sees the last one. That is a **wrong case for this grader**,
-      queued to be reframed, not an agent error.
-   3. **Duplicate measure names resolve silently.** Two tables with an `amount` column both
+      queued to be reframed, not an agent error. **Reframed and re-measured (2026-07-26)**: it now
+      asks for one row per customer with a support case, a single gradeable result set. It still
+      fails 0/3, but now for a real reason - `[2, 3405]` against an expected `[1702.5, 2]`, i.e.
+      exactly the 2x fan-out inflation for a customer with two tickets. The grain warning added in
+      6.2 appears in the context and did not prevent it, so a passive warning is not enough here.
+   3. **Duplicate measure names resolve silently** - ✅ Fixed (2026-07-26). Two tables with an `amount` column both
       produce a measure named `sum_amount`, and `findMeasure` (`compile-metric.ts:33`) returns the
       first by entity order. Same for duplicate dimension names, and `ensureJoin` matches on the
       table pair rather than the column, so two FKs into one target pick whichever edge sorts
-      first. Deliberately left out of the hard dataset: it is an engine ambiguity to fix, not a
-      grounding trap to grade.
+      first.
+      **It was not hypothetical**: the committed hard dataset already had `sum_net_amt` on both
+      `inv` and `inv_staging`, and its engine cases were passing only because `inv` sorts before
+      `inv_staging` - the measurement infrastructure had a coin flip in it.
+      **The fix**: measure names are unique across the model, table-qualifying *every* side of a
+      collision so the outcome never depends on table order (`inv_sum_net_amt`,
+      `inv_staging_sum_net_amt`). Names that do not collide are untouched, so the original dataset
+      has zero renames. Unique names rather than refuse-on-ambiguity - which would have matched
+      the compiler's usual style - because a catalog keyed by name cannot hold duplicates and
+      `resolve_terms` was offering two identical-looking entries pointing at different tables.
+      The remaining half (`ensureJoin` matching on the table pair rather than the column, so two
+      FKs into one target pick whichever edge sorts first) is still open.
+      **Re-measured after the fix**: the hard A/B is unchanged at **+30.6** (grounded 31/36,
+      raw-sql 20/36) across two runs at different code states, which is a useful reproducibility
+      signal for the harness itself.
 7. Short planning/decomposition for multi-part questions (bounded).
 8. **Native desktop app** (decided 2026-07-25) — the flagship product surface.
    A native macOS app (Swift + AppKit) embeds a libghostty terminal pane running

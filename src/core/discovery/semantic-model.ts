@@ -136,6 +136,33 @@ function enrichEntity(
   return { dimensions, measures };
 }
 
+/**
+ * Make measure names unique across the whole model, table-qualifying every side of a
+ * collision. Two tables with an `amount` column both produce `sum_amount`, and the
+ * metric compiler resolves a name by scanning entities in order — so it silently
+ * computed the first table's measure, and term resolution offered two entries a user
+ * could not tell apart. A catalog keyed by name cannot hold duplicates.
+ *
+ * Both sides are renamed, not just the later one, so the outcome never depends on
+ * table order. Names that do not collide are left alone.
+ */
+function disambiguateMeasures(entities: SemanticEntity[]): void {
+  const owners = new Map<string, SemanticEntity[]>();
+  for (const entity of entities) {
+    for (const measure of entity.measures) {
+      owners.set(measure.name, [...(owners.get(measure.name) ?? []), entity]);
+    }
+  }
+
+  for (const [name, holders] of owners) {
+    if (holders.length < 2) continue;
+    for (const entity of holders) {
+      const measure = entity.measures.find((m) => m.name === name);
+      if (measure) measure.name = `${entity.table}_${name}`;
+    }
+  }
+}
+
 export function buildSemanticModel(
   tableNames: string[],
   relationships: Relationship[],
@@ -162,6 +189,7 @@ export function buildSemanticModel(
       hasOne: [],
     };
   });
+  disambiguateMeasures(entities);
   const byTable = new Map(entities.map((entity) => [entity.table, entity]));
 
   for (const rel of relationships) {

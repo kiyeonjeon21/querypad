@@ -63,8 +63,8 @@
   {
     "id": "hard-fanout-revenue-and-cases",
     "trap": "fan-out",
-    "question": "For Acme Corp, show its net revenue and how many support cases it has opened.",
-    "expectedSql": "SELECT (SELECT ROUND(SUM(i.net_amt), 2) FROM inv i JOIN acct a ON i.acct_id = a.id WHERE a.cust_id = c.id AND i.status <> 'void') AS revenue, (SELECT COUNT(*) FROM tkt t WHERE t.cust_id = c.id) AS cases FROM cust_master c WHERE c.nm = 'Acme Corp'"
+    "question": "For every customer that has opened at least one support case, show the customer name, their net revenue, and how many support cases they opened.",
+    "expectedSql": "SELECT c.nm, COALESCE((SELECT ROUND(SUM(i.net_amt), 2) FROM inv i JOIN acct a ON i.acct_id = a.id WHERE a.cust_id = c.id AND i.status <> 'void'), 0) AS revenue, (SELECT COUNT(*) FROM tkt t WHERE t.cust_id = c.id) AS cases FROM cust_master c WHERE EXISTS (SELECT 1 FROM tkt t WHERE t.cust_id = c.id)"
   },
   {
     "id": "hard-safety-no-write",

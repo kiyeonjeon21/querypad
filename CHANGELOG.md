@@ -5,6 +5,22 @@ and public product updates.
 
 ## Unreleased
 
+### Measure names are unique, and the fan-out case is gradeable (bug fix)
+
+- Two tables with the same numeric column produced the same measure name, and the metric compiler
+  resolved a name by scanning entities in order - so it silently computed the first table's
+  measure. **This was live**: the committed hard dataset already had `sum_net_amt` on both `inv`
+  and `inv_staging`, and its engine cases passed only because `inv` sorts before `inv_staging`
+- Measure names are now unique across the model, table-qualifying *every* side of a collision so
+  the outcome never depends on table order. Names that do not collide are untouched
+- The eval's fan-out case asked for two numbers, the agent answered with two queries, and the row
+  grader only saw the last one - it was failing for harness reasons. Reframed to one row per
+  customer: a single gradeable result set that keeps the trap sharp
+- **Re-measured**: the hard A/B is unchanged at **+30.6** (grounded 31/36, raw-sql 20/36) across
+  two runs at different code states, which is a reproducibility signal for the harness itself.
+  The reframed fan-out case still fails, but now for a real reason - an exact 2x fan-out
+  inflation rather than a grading artifact
+
 ### A price column is no longer mistaken for a join target (bug fix)
 
 - Relationship inference treated **any** unique, non-null column as a valid foreign-key target.

@@ -72,11 +72,17 @@
   {
     "id": "hard-entity-inv",
     "kind": "entity",
-    "describe": "Inv exposes the authoritative money measure and its status/date dimensions",
+    "describe": "Inv exposes the authoritative money measure (table-qualified: inv_staging has net_amt too) and its status/date dimensions",
     "entity": "Inv",
     "table": "inv",
-    "measures": ["inv_count", "sum_net_amt"],
-    "dimensions": ["status", "issued_on"]
+    "measures": [
+      "inv_count",
+      "inv_sum_net_amt"
+    ],
+    "dimensions": [
+      "status",
+      "issued_on"
+    ]
   },
   {
     "id": "hard-entity-cust-master",
@@ -84,8 +90,13 @@
     "describe": "CustMaster derives the soft-delete flag as a groupable dimension",
     "entity": "CustMaster",
     "table": "cust_master",
-    "measures": ["cust_master_count"],
-    "dimensions": ["is_active", "signed_on"]
+    "measures": [
+      "cust_master_count"
+    ],
+    "dimensions": [
+      "is_active",
+      "signed_on"
+    ]
   },
   {
     "id": "hard-entity-tkt",
@@ -93,8 +104,12 @@
     "describe": "Tkt exposes severity as a dimension",
     "entity": "Tkt",
     "table": "tkt",
-    "measures": ["tkt_count"],
-    "dimensions": ["sev"]
+    "measures": [
+      "tkt_count"
+    ],
+    "dimensions": [
+      "sev"
+    ]
   },
   {
     "id": "hard-entity-inv-line",
@@ -102,46 +117,77 @@
     "describe": "InvLine derives measures over its numeric columns",
     "entity": "InvLine",
     "table": "inv_line",
-    "measures": ["inv_line_count", "sum_qty", "sum_unit_amt"]
+    "measures": [
+      "inv_line_count",
+      "sum_qty",
+      "sum_unit_amt"
+    ]
   },
   {
     "id": "hard-metric-revenue-by-status",
     "kind": "metric",
     "describe": "the money measure compiles grouped by its own table's dimension",
-    "metric": { "metric": "sum_net_amt", "dimensions": ["status"] }
+    "metric": {
+      "metric": "inv_sum_net_amt",
+      "dimensions": [
+        "status"
+      ]
+    }
   },
   {
     "id": "hard-metric-count-by-status",
     "kind": "metric",
     "describe": "an invoice count compiles grouped by status",
-    "metric": { "metric": "inv_count", "dimensions": ["status"] }
+    "metric": {
+      "metric": "inv_count",
+      "dimensions": [
+        "status"
+      ]
+    }
   },
   {
     "id": "hard-metric-refuses-payment-fanout",
     "kind": "metric",
     "describe": "revenue grouped by a payment date would fan out invoices across payments",
-    "metric": { "metric": "sum_net_amt", "dimensions": ["paid_on"] },
+    "metric": {
+      "metric": "inv_sum_net_amt",
+      "dimensions": [
+        "paid_on"
+      ]
+    },
     "expectRefusal": true
   },
   {
     "id": "hard-metric-refuses-ticket-fanout",
     "kind": "metric",
     "describe": "counting customers by ticket severity would fan out customers across tickets",
-    "metric": { "metric": "cust_master_count", "dimensions": ["sev"] },
+    "metric": {
+      "metric": "cust_master_count",
+      "dimensions": [
+        "sev"
+      ]
+    },
     "expectRefusal": true
   },
   {
     "id": "hard-metric-refuses-multi-hop",
     "kind": "metric",
     "describe": "revenue by ticket severity is more than one hop and must be refused rather than guessed",
-    "metric": { "metric": "sum_net_amt", "dimensions": ["sev"] },
+    "metric": {
+      "metric": "inv_sum_net_amt",
+      "dimensions": [
+        "sev"
+      ]
+    },
     "expectRefusal": true
   },
   {
     "id": "hard-metric-refuses-unknown",
     "kind": "metric",
     "describe": "an undefined metric is refused with the available list",
-    "metric": { "metric": "gross_margin" },
+    "metric": {
+      "metric": "gross_margin"
+    },
     "expectRefusal": true
   },
   {
@@ -149,7 +195,7 @@
     "kind": "term",
     "describe": "GLOSSARY-BACKED: 'revenue' reaches the opaque net_amt measure, which shares no token with sum_net_amt",
     "term": "revenue",
-    "resolvesTo": "sum_net_amt"
+    "resolvesTo": "inv_sum_net_amt"
   },
   {
     "id": "hard-term-customer",

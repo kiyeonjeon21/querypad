@@ -149,3 +149,52 @@ test("e2e: export-okf emits an interlinked OKF bundle", async () => {
   const users = await readFile(path.join(dir, ".datactx", "okf", "users.md"), "utf8");
   assert.match(users, /type:/);
 });
+
+// ---- mcp-attach: the stdio <-> socket bridge -----------------------------------
+
+test("mcp-attach bridges stdio to a unix socket in both directions", async () => {
+  const { createServer } = await import("node:net");
+  const { spawn } = await import("node:child_process");
+
+  const socketPath = path.join(await mkdtemp(path.join(tmpdir(), "querypad-attach-")), "s.sock");
+
+  // The test plays the desktop app: host a socket, and to prove both directions
+  // work, echo every line back wrapped so the origin is distinguishable.
+  const server = createServer((conn) => {
+    conn.on("data", (chunk) => {
+      conn.write(`echo:${chunk.toString()}`);
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(socketPath, resolve));
+
+  try {
+    const child = spawn(process.execPath, ["--import", "tsx", CLI, "mcp-attach", socketPath], {
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    const received = new Promise<string>((resolve) => {
+      let out = "";
+      child.stdout.on("data", (chunk) => {
+        out += chunk.toString();
+        if (out.includes("\n")) resolve(out);
+      });
+    });
+
+    child.stdin.write('{"jsonrpc":"2.0","id":1,"method":"ping"}\n');
+    const roundTripped = await received;
+    assert.equal(roundTripped, 'echo:{"jsonrpc":"2.0","id":1,"method":"ping"}\n');
+
+    // Closing stdin ends the bridge cleanly.
+    child.stdin.end();
+    const code = await new Promise<number>((resolve) => child.on("exit", (c) => resolve(c ?? 1)));
+    assert.equal(code, 0);
+  } finally {
+    server.close();
+  }
+});
+
+test("mcp-attach fails loudly when the socket does not exist", async () => {
+  const result = await cli(["mcp-attach", "/tmp/querypad-no-such-socket.sock"]);
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /mcp-attach:/);
+});

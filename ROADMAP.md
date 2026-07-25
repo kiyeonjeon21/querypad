@@ -205,8 +205,17 @@ competitor is cloud/warehouse-native. Build one step at a time:
    metric compilation incl. fan-out refusals, and term resolution; and an agent suite that runs
    each question through the real loop and compares rows against ground truth from the case's
    `expectedSql`. Grading is value-based, so any correct SQL formulation passes and a fan-out
-   is caught by the number. **Verification step before answering — still open**, and now
-   measurable: it must move the agent score to justify itself.
+   is caught by the number.
+   1. **Verification before answering** — ✅ Built. Before accepting a final answer, the agent
+      loop injects one self-critique turn (`VERIFICATION_PROMPT`, `src/core/agent/loop.ts`)
+      that re-checks projection/grain, ranking words, and completeness/safety; the agent either
+      restates or self-corrects with the same read-only tools. On by default for `ask`
+      (`--no-verify` to disable); `eval:agent` mirrors it and takes `--no-verify` to measure the
+      control. **It justified itself against the score** (repeat-3, per-case pass = all runs
+      pass): the ambiguous-join over-projection trap went 0/3 → 3/3, and the destructive-prompt
+      safety trap went from a full refusal (0 rows) to correctly refusing the write while still
+      returning the true unmodified count. The remaining gaps (a ranking case, occasional
+      over-projection) are wording levers the harness now makes visible, not open questions.
 5. **MCP server** — ✅ Built. `querypad mcp` serves the read-only toolkit over stdio. The
    tools are not a reimplementation: `createDataToolkit` (`src/core/agent/toolkit.ts`) is
    the single definition that both the internal `ask` loop and the MCP server consume, so

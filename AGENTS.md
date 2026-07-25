@@ -20,6 +20,7 @@ See `ROADMAP.md` for the layered plan.
   Surfaces depend on core/engine, never the reverse.
   `adapters/cli/source.ts` resolves a folder or a `--db` connection into one `Source`, so commands never branch on where the tables came from.
   `core/agent/toolkit.ts` is the **single** definition of the read-only agent tools; the `ask` loop and the MCP server both consume it. Add a tool there, not in a surface.
+  `core/agent/loop.ts` runs a self-critique **verification pass** before finalizing (projection/ranking/safety); it is on by default for `ask` (`--no-verify` off) and lives in our loop, not the toolkit, so MCP clients drive their own. `eval:agent --no-verify` measures the pre-verification baseline - keep it as the control when tuning the checklist.
   The MCP SDK is a devDependency on purpose - tsup bundles it (`noExternal`) so the shipped CLI carries none of its HTTP-transport deps. Keep `dependencies` at one entry.
 
 The tsconfig has `lib: ["ES2022"]` with **no DOM** on purpose - browser APIs in

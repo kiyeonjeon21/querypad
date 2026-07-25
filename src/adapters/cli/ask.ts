@@ -50,6 +50,8 @@ export interface RunAskOptions {
   showSql?: boolean;
   /** Max tool-using turns for the agent loop (default 8). */
   maxSteps?: number;
+  /** Run a self-critique pass before answering (default true). */
+  verify?: boolean;
   /** Print each agent tool step. */
   verbose?: boolean;
   /** Injected in tests; built from env credentials otherwise. */
@@ -157,6 +159,7 @@ export async function runAsk(options: RunAskOptions): Promise<AskResult> {
         runner: db.runner,
         complete: ai.agentComplete,
         maxSteps: options.maxSteps,
+        verify: options.verify ?? true,
         onStep: options.verbose ? (step) => log(formatStep(step)) : undefined,
       });
 

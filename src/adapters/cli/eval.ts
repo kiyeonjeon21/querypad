@@ -11,6 +11,8 @@ export interface RunEvalOptions {
   /** Agent suite: run each case N times to surface non-determinism. */
   repeat?: number;
   provider?: string;
+  /** Agent suite: run the self-critique pass (default true; --no-verify sets false). */
+  verify?: boolean;
   log?: (line: string) => void;
 }
 
@@ -33,6 +35,7 @@ export async function runEval(options: RunEvalOptions): Promise<number> {
         only: options.only,
         repeat: options.repeat,
         provider: options.provider,
+        verify: options.verify,
         onProgress: options.json ? undefined : (line) => log(line),
       });
       break;

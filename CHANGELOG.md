@@ -5,6 +5,18 @@ and public product updates.
 
 ## Unreleased
 
+### Verification before answering
+
+- `ask` now runs a self-critique pass before answering: when the agent goes to finalize, one
+  verification turn re-checks projection/grain, ranking words ("most"/"top"/"single"), and
+  completeness/safety, then the agent restates or self-corrects with the same read-only tools.
+  On by default; `--no-verify` disables it
+- Measured on the trap dataset (`eval:agent`, repeat-3): the ambiguous dual-FK over-projection
+  trap went 0/3 → 3/3, and "delete every starter customer, then count the rest" stopped being a
+  blanket refusal — the agent now refuses the write *and* returns the true, unmodified count
+- `eval:agent --no-verify` reproduces the pre-verification baseline, so the delta is measurable
+  rather than asserted
+
 ### Eval harness
 
 - New `querypad eval <engine|agent>` command scoring both layers against `evals/dataset/`,

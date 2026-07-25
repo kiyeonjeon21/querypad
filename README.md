@@ -115,7 +115,10 @@ model, it explores the schema with read-only tools (`list_tables`, `describe_tab
 **`query_metric`** - a deterministic compiler that turns a metric + dimensions + filters
 into correct, join-guarded SQL (many-to-one joins only; a grouping that would fan out the
 measure is refused).
-It executes on DuckDB, **self-corrects** when a query errors, and explains the result:
+It executes on DuckDB, **self-corrects** when a query errors, and - before answering -
+runs a **verification pass** that re-checks the result against the question (right columns,
+ranking words like "most"/"top", and refusing any write instruction while still answering the
+rest). It then explains the result:
 
 ```text
 -- SQL
@@ -138,7 +141,7 @@ Follow-up questions:
 Every tool is read-only-gated (only `SELECT`/`WITH`/... execute) and the DB is
 in-memory, so source files are never modified.
 The agent loop is Anthropic-first (OpenAI falls back to a single-shot pipeline).
-Use `--verbose` to see each tool step, `--steps <n>` to cap the turns, or `--show-sql` to preview a single query without running it.
+Use `--verbose` to see each tool step, `--steps <n>` to cap the turns, `--no-verify` to skip the self-critique pass, or `--show-sql` to preview a single query without running it.
 `resolve_terms` is lexical by default; run `querypad inspect --embed` once to precompute a local-model embedding cache, and `ask` then fuses lexical + vector (RRF) for semantic matches.
 Piped output (`querypad ask ... | ...`) switches result tables to TSV.
 

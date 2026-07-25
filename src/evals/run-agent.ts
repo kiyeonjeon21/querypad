@@ -46,6 +46,8 @@ export interface AgentSuiteOptions {
   repeat?: number;
   provider?: string;
   maxSteps?: number;
+  /** Run the self-critique pass before grading (default true; mirrors shipped `ask`). */
+  verify?: boolean;
   onProgress?: (line: string) => void;
   /** Injected in tests; built from env credentials otherwise. */
   complete?: AgentComplete;
@@ -120,6 +122,7 @@ export async function runAgentSuite(options: AgentSuiteOptions = {}): Promise<Su
             relationships: dataset.relationships,
             runner: db.runner,
             maxSteps: options.maxSteps,
+            verify: options.verify ?? true,
             complete,
           });
           runs.push(await gradeRun(testCase, db.runner, agent));

@@ -30,7 +30,8 @@ Usage:
                                    Claude Code / Cursor. Accepts --db/--schema/--out too.
   querypad eval <engine|agent>     Score the engine (deterministic, no API key) or the agent
                                    (needs a key) against evals/cases/. --json for raw output;
-                                   agent accepts --cases <id,…> and --repeat <n>.
+                                   agent accepts --cases <id,…>, --repeat <n>, and --no-verify
+                                   (measures the baseline with the self-critique pass off).
   querypad help                    Show this help
 
 External databases (inspect · ask · enrich):
@@ -48,6 +49,9 @@ Options for ask:
                                    (agent mode is Anthropic-first; OpenAI uses single-shot)
   --show-sql                       Print the generated SQL without executing
   --steps <n>                      Max agent tool-using turns (default: 8)
+  --no-verify                      Skip the self-critique pass (on by default:
+                                   the agent re-checks projection/ranking/safety
+                                   before answering)
   --verbose                        Print each agent tool step
 
 Environment: ANTHROPIC_API_KEY or OPENAI_API_KEY for the chosen provider.
@@ -133,6 +137,7 @@ async function main(argv: string[]): Promise<number> {
         provider: stringFlag(flags, "provider"),
         showSql: flags["show-sql"] === true,
         maxSteps: steps && Number.isFinite(steps) ? steps : undefined,
+        verify: flags["no-verify"] !== true,
         verbose: flags.verbose === true,
       });
       return 0;
@@ -182,6 +187,7 @@ async function main(argv: string[]): Promise<number> {
         only: typeof flags.cases === "string" ? flags.cases.split(",") : undefined,
         repeat: repeat && Number.isFinite(repeat) ? repeat : undefined,
         provider: stringFlag(flags, "provider"),
+        verify: flags["no-verify"] !== true,
       });
     }
     case "mcp": {

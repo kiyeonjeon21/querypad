@@ -1,0 +1,17 @@
+id,cust_id,region_cd,is_active
+1,1,NA-W,true
+2,1,EU,true
+3,2,NA-E,true
+4,3,NA-W,true
+5,4,EU,true
+6,4,APAC,true
+7,5,NA-E,true
+8,6,NA-W,true
+9,7,NA-E,false
+10,8,APAC,true
+11,10,EU,true
+12,11,NA-W,true
+13,11,NA-E,true
+14,12,EU,false
+15,13,APAC,true
+16,14,NA-W,false

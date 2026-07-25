@@ -49,3 +49,8 @@ jobs:
       # Deterministic engine evals only — the agent suite costs tokens and is run manually.
       - name: Run engine evals
         run: npm run eval:engine
+
+      # The hard dataset's engine suite is equally deterministic, and it also guards the
+      # glossary -> term-resolution chain that the agent A/B depends on.
+      - name: Run engine evals (hard dataset)
+        run: npm run eval:engine:hard

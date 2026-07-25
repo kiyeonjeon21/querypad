@@ -20,6 +20,12 @@ export interface RunEvalOptions {
   ab?: boolean;
   /** Agent suite: the agent's turn budget. */
   steps?: number;
+  /** Score a different dataset folder (default: the committed evals/dataset). */
+  dataset?: string;
+  /** Score a different cases file (note: --cases is the case-id filter). */
+  casesFile?: string;
+  /** Apply a committed glossary, e.g. a hard dataset's curation. */
+  glossary?: string;
   log?: (line: string) => void;
 }
 
@@ -34,10 +40,17 @@ export async function runEval(options: RunEvalOptions): Promise<number> {
   let report: SuiteReport;
   switch (options.suite) {
     case "engine":
-      report = await runEngineSuite();
+      report = await runEngineSuite({
+        datasetDir: options.dataset,
+        casesFile: options.casesFile,
+        glossaryFile: options.glossary,
+      });
       break;
     case "agent": {
       const shared = {
+        datasetDir: options.dataset,
+        casesFile: options.casesFile,
+        glossaryFile: options.glossary,
         only: options.only,
         repeat: options.repeat,
         provider: options.provider,

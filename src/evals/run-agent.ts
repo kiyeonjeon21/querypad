@@ -6,11 +6,10 @@ import { DATA_TOOL_DEFINITIONS } from "../core/agent/toolkit";
 import type { QueryRunner } from "../core/discovery/relationships";
 import { prepareDataset } from "../adapters/dataset";
 import { resolveAiCredentials } from "../adapters/cli/ai-env";
-import { resolveSource } from "../adapters/cli/source";
 import { createNodeDb } from "../engine/duckdb/connection";
 import { ARMS, ARM_IDS, type ArmId } from "./arms";
 import { checkBehavior, compareRows } from "./grade";
-import { EVAL_DATASET } from "./run-engine";
+import { EVAL_DATASET, loadEvalDataset, type EvalDatasetOptions } from "./run-engine";
 import type { AgentCase, CaseResult, SuiteConfig, SuiteReport } from "./types";
 
 export const AGENT_CASES = "evals/cases/agent.json";
@@ -51,8 +50,7 @@ function buildComplete(provider?: string): AgentComplete {
     });
 }
 
-export interface AgentSuiteOptions {
-  datasetDir?: string;
+export interface AgentSuiteOptions extends EvalDatasetOptions {
   casesFile?: string;
   /** Restrict to these case ids. */
   only?: string[];
@@ -78,6 +76,15 @@ export interface AgentSuiteOptions {
   onProgress?: (line: string) => void;
   /** Injected in tests; built from env credentials otherwise. */
   complete?: AgentComplete;
+}
+
+/** Dataset/cases identity recorded on every report. */
+function identity(options: AgentSuiteOptions) {
+  return {
+    dataset: options.datasetDir ?? EVAL_DATASET,
+    casesFile: options.cases ? "<injected>" : (options.casesFile ?? AGENT_CASES),
+    glossary: Boolean(options.glossaryFile),
+  };
 }
 
 interface RunGrade {
@@ -242,10 +249,7 @@ export async function runAgentSuite(options: AgentSuiteOptions = {}): Promise<Su
   const repeat = Math.max(1, options.repeat ?? 1);
   const db = await createNodeDb();
   try {
-    const dataset = await prepareDataset(
-      { ...resolveSource({ folder: options.datasetDir ?? EVAL_DATASET }), outDir: "/dev/null" },
-      db.runner
-    );
+    const dataset = await loadEvalDataset(options, db.runner);
 
     const deps: CaseDeps = {
       dataset,
@@ -268,6 +272,7 @@ export async function runAgentSuite(options: AgentSuiteOptions = {}): Promise<Su
       arm: armId,
       generatedAt: Date.now(),
       config: describeConfig(armId, deps),
+      ...identity(options),
       ...tally(results),
       results,
     };
@@ -310,10 +315,7 @@ export async function runAbSuite(
   const repeat = Math.max(1, options.repeat ?? 1);
   const db = await createNodeDb();
   try {
-    const dataset = await prepareDataset(
-      { ...resolveSource({ folder: options.datasetDir ?? EVAL_DATASET }), outDir: "/dev/null" },
-      db.runner
-    );
+    const dataset = await loadEvalDataset(options, db.runner);
 
     const deps: CaseDeps = {
       dataset,
@@ -343,6 +345,7 @@ export async function runAbSuite(
           arm: armId,
           generatedAt,
           config: describeConfig(armId, deps),
+          ...identity(options),
           ...tally(results),
           results,
         };

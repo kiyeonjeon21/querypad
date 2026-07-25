@@ -157,7 +157,12 @@ export function formatComparison(a: SuiteReport, b: SuiteReport): string {
 export async function writeReport(report: SuiteReport, dir = RESULTS_DIR): Promise<string> {
   await mkdir(path.resolve(dir), { recursive: true });
   const arm = report.arm ? `-${report.arm}` : "";
-  const file = path.resolve(dir, `${report.suite}${arm}-${report.generatedAt}.json`);
+  // The dataset belongs in the name: two datasets would otherwise leave
+  // indistinguishable baselines side by side in the results directory.
+  const dataset = report.dataset
+    ? `-${path.basename(report.dataset).replace(/[^A-Za-z0-9_-]/g, "_")}`
+    : "";
+  const file = path.resolve(dir, `${report.suite}${arm}${dataset}-${report.generatedAt}.json`);
   await writeFile(file, JSON.stringify(report, null, 2));
   return file;
 }

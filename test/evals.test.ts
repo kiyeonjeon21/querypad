@@ -4,6 +4,16 @@ import { checkBehavior, compareRows } from "../src/evals/grade";
 import type { AgentComplete } from "../src/core/agent/loop";
 import type { AgentCase } from "../src/evals/types";
 
+async function tempJson(name: string, data: unknown): Promise<string> {
+  const { mkdtemp, writeFile } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const path = await import("node:path");
+  const dir = await mkdtemp(path.join(tmpdir(), "querypad-eval-"));
+  const file = path.join(dir, name);
+  await writeFile(file, JSON.stringify(data));
+  return file;
+}
+
 const rows = (data: Record<string, unknown>[]) => ({
   columns: Object.keys(data[0] ?? {}),
   rows: data,
@@ -450,4 +460,51 @@ test("runAbSuite measures both arms and formatComparison renders the delta", asy
   assert.match(out, /delta/);
   assert.match(out, /validity checks/);
   assert.match(out, /turn budget hit on 0\//);
+});
+
+// ---- dataset parameterization -------------------------------------------------
+
+test("suites can score a different dataset, and record which one they scored", async () => {
+  const { runEngineSuite } = await import("../src/evals/run-engine");
+
+  const committed = await runEngineSuite();
+  assert.equal(committed.dataset, "evals/dataset");
+  assert.equal(committed.casesFile, "evals/cases/engine.json");
+  assert.equal(committed.glossary, false);
+  assert.equal(committed.score, 1, "the default pair must stay green");
+
+  // Pointed at a different folder the same cases no longer hold, which is the
+  // proof that datasetDir is actually honored rather than silently ignored.
+  const elsewhere = await runEngineSuite({ datasetDir: "fixtures/data" });
+  assert.equal(elsewhere.dataset, "fixtures/data");
+  assert.ok(elsewhere.failed > 0, "eval cases should not pass against another dataset");
+});
+
+test("a scored glossary is recorded on the report and reaches the model", async () => {
+  const { runAgentSuite } = await import("../src/evals/run-agent");
+  const glossaryFile = await tempJson("glossary.json", {
+    generatedAt: 1,
+    entries: [
+      {
+        term: "revenue",
+        definition: "Money billed.",
+        synonyms: ["net revenue"],
+        mapsTo: { table: "products", column: "unit_price" },
+        confidence: 0.9,
+      },
+    ],
+    applied: [],
+  });
+
+  const spy = spyComplete(scriptedAgent(() => COUNT_SQL));
+  const report = await runAgentSuite({
+    only: ["simple-count"],
+    glossaryFile,
+    complete: spy.complete,
+  });
+
+  assert.equal(report.glossary, true);
+  assert.equal(report.dataset, "evals/dataset");
+  // The glossary annotation must actually reach the grounding context the model saw.
+  assert.match(spy.calls[0].system, /aka net revenue/);
 });

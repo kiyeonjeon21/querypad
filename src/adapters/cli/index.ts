@@ -34,6 +34,8 @@ Usage:
                                    --no-verify (baseline with the self-critique pass off),
                                    --arm <grounded|raw-sql>, and --ab (run both arms
                                    interleaved and print the grounding comparison).
+                                   Both suites accept --dataset <folder>, --cases-file <path>
+                                   and --glossary <path> to score a different dataset.
   querypad help                    Show this help
 
 External databases (inspect · ask · enrich):
@@ -193,6 +195,9 @@ async function main(argv: string[]): Promise<number> {
         verify: flags["no-verify"] !== true,
         arm: stringFlag(flags, "arm"),
         ab: flags.ab === true,
+        dataset: stringFlag(flags, "dataset"),
+        casesFile: stringFlag(flags, "cases-file"),
+        glossary: stringFlag(flags, "glossary"),
         steps: evalSteps && Number.isFinite(evalSteps) ? evalSteps : undefined,
       });
     }

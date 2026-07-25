@@ -230,11 +230,15 @@ competitor is cloud/warehouse-native. Build one step at a time:
    SQL history, charts).
    The engine is not rewritten; the app is a third adapter beside `cli` and `mcp`.
    Phases, in order:
-   1. **Gap experiment (validation, zero code)** — cmux + Claude Code +
-      `querypad mcp` on a real dataset; write down what a plain terminal cannot
-      do (results scroll away, no graph, no curation UI). That list is the app's
-      feature spec. Also A/B the CLI-only vs MCP-connected agent on the eval
-      trap questions so the grounding value is measured, not assumed.
+   1. **Gap experiment (validation)** — two halves, and the measurable half is done.
+      1. *Grounding A/B* — ✅ Built (`eval agent --ab`, see step 4.2). The A/B
+         originally sketched here was "CLI-only vs MCP-connected agent", which
+         confounds the external client with the grounding; running both arms
+         inside our own loop isolates the claim instead.
+      2. *Qualitative session (still open)* — cmux + Claude Code + `querypad mcp`
+         on a real dataset; write down what a plain terminal cannot do (results
+         scroll away, no graph, no curation UI). That list is the app's feature
+         spec, and it needs a human at the keyboard, not a score.
    2. **Embedding spike** — minimal Swift app with a GhosttyKit pane
       (libghostty-spm) running `claude`; pin and vendor the framework, and keep
       the terminal component behind a protocol so SwiftTerm stays a fallback.

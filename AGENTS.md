@@ -44,6 +44,34 @@ core/engine are a type error, not a code-review catch.
 - Agent grading is value-based (`src/evals/grade.ts`): column names and row order are ignored unless
   the case sets `orderSensitive`. Add behavioral expectations (`mustUseTool`, `maxSteps`) when the
   *route* to the answer matters, not just the number.
+- Tool **subsetting** belongs in `createDataToolkit` (`only`), not in a surface - same rule as adding
+  a tool. A surface that built its own tool list would be a second place that knows tool names.
+
+### The grounding A/B (`eval agent --ab`, `src/evals/arms.ts`)
+
+`grounded` vs `raw-sql` measures the product's central claim, so its integrity rules are strict:
+
+- **`grounded` is the zero-override arm** - no `tools`, no `systemPrompt`, so it runs the shipped
+  path. A test asserts it is identical to a plain `runAgentSuite()`; keep it that way or "we measured
+  what ships" stops being true.
+- **The control's prompt is a mechanical translation of `AGENT_SYSTEM_PROMPT`.** Licensed edits: name
+  the read-only statements it inspects with (it has no `describe_table`), and drop the "ground your
+  SQL in the relationships below" line. No dataset knowledge, no added strategy hints, and keep
+  "All tools are read-only" - that is mechanics parity, and dropping it would break the safety case
+  for a reason unrelated to the hypothesis.
+- **A/B grading is accuracy-only for both arms** (`behavioral: false`). Leaving the case file's
+  assertions on would grade the grounded arm on correctness *and* efficiency while grading the
+  control on correctness alone - a strictly harder rubric for the arm under test. Behavioral
+  assertions stay live in the single-arm `eval:agent` regression run, which is where they belong.
+- **Identical `maxSteps`, `verify`, model and temperature in both arms.** A run is invalid - not a
+  result - if either arm hit the turn budget (`budgetExhausted`) or if the control failed a
+  `baseline` control case. Read those validity checks before reading the score.
+- **Never quote an A/B number without its `config` block.** Reports carry the arm, repeat, verify,
+  behavioral, maxSteps, tools and the exact system prompt for exactly this reason.
+- `--repeat` with the strict all-runs-must-pass rule estimates p^N, not p, so the A/B headline is the
+  **run-level** pass rate (`runsPassed`/`runsTotal`). With 12 cases the paired per-case table is the
+  real evidence; an aggregate delta under roughly 15 points is underpowered, and saying so is the
+  honest report.
 
 ## Release and verification
 

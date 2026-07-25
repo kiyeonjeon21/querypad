@@ -48,7 +48,8 @@
     "version": "npm run check:version",
     "test:cli": "node --import tsx --test test/*.test.ts",
     "eval:engine": "tsx src/adapters/cli/index.ts eval engine",
-    "eval:agent": "tsx src/adapters/cli/index.ts eval agent"
+    "eval:agent": "tsx src/adapters/cli/index.ts eval agent",
+    "eval:ab": "tsx src/adapters/cli/index.ts eval agent --ab"
   },
   "dependencies": {
     "@duckdb/node-api": "^1.5.3-r.3"

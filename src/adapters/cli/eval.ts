@@ -1,6 +1,7 @@
-import { formatReport, writeReport } from "../../evals/report";
+import { formatComparison, formatReport, writeReport } from "../../evals/report";
 import { runEngineSuite } from "../../evals/run-engine";
 import type { SuiteReport } from "../../evals/types";
+import { parseArm } from "../../evals/arms";
 
 export interface RunEvalOptions {
   suite: string;
@@ -13,6 +14,12 @@ export interface RunEvalOptions {
   provider?: string;
   /** Agent suite: run the self-critique pass (default true; --no-verify sets false). */
   verify?: boolean;
+  /** Agent suite: which configuration to measure (default "grounded"). */
+  arm?: string;
+  /** Agent suite: run both arms interleaved and print the comparison. */
+  ab?: boolean;
+  /** Agent suite: the agent's turn budget. */
+  steps?: number;
   log?: (line: string) => void;
 }
 
@@ -30,13 +37,34 @@ export async function runEval(options: RunEvalOptions): Promise<number> {
       report = await runEngineSuite();
       break;
     case "agent": {
-      const { runAgentSuite } = await import("../../evals/run-agent");
-      report = await runAgentSuite({
+      const shared = {
         only: options.only,
         repeat: options.repeat,
         provider: options.provider,
         verify: options.verify,
-        onProgress: options.json ? undefined : (line) => log(line),
+        maxSteps: options.steps,
+        onProgress: options.json ? undefined : (line: string) => log(line),
+      };
+
+      // A/B: both arms over the same cases, interleaved, graded identically.
+      if (options.ab) {
+        const { runAbSuite } = await import("../../evals/run-agent");
+        const { arms } = await runAbSuite(shared);
+        if (options.json) {
+          log(JSON.stringify({ arms }, null, 2));
+        } else {
+          log(formatComparison(arms[0], arms[1]));
+          for (const arm of arms) log(`\nWrote ${await writeReport(arm)}`);
+        }
+        // A control arm doing badly is the expected finding, not a failure — only
+        // a harness malfunction should make this exit non-zero.
+        return arms.some((a) => a.errored > 0) ? 1 : 0;
+      }
+
+      const { runAgentSuite } = await import("../../evals/run-agent");
+      report = await runAgentSuite({
+        ...shared,
+        arm: options.arm ? parseArm(options.arm) : undefined,
       });
       break;
     }

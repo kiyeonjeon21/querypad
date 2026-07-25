@@ -5,7 +5,8 @@
 QueryPad is **Cursor for Data** - a local-first, terminal-first AI CLI that
 understands datasets (discovers relationships, builds semantic models) before
 generating SQL.
-The web app was retired (tag `web-final`); the surfaces are the CLI today and an MCP server next.
+The web app was retired (tag `web-final`); the surfaces are the CLI and the MCP server.
+The planned flagship surface is a native macOS desktop app (Swift + libghostty) that runs Claude Code / Codex against the MCP server - the CLI and MCP stay first-class as its foundation, and the web only ever returns as an intro/landing page after the rename.
 See `ROADMAP.md` for the layered plan.
 
 ## Layout: core / engine / adapters

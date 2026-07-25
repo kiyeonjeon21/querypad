@@ -9,13 +9,11 @@ The execution layer is solved — DuckDB does it well. The unsolved problem is
 connect, which join is correct. That is the bottleneck this roadmap attacks, and
 the reason the understanding engine is built **CLI-first**.
 
-**Surface decision (2026-07): terminal-first.** The browser app was retired
-(tag `web-final`, ~6k LOC removed); repeating it in a TUI would compete with
-polished terminal SQL IDEs (Harlequin) on ground that is not our moat. The
-surfaces are the CLI and an MCP server today, and possibly a dedicated
-terminal host later (cmux demonstrates the shape: a native host embedding
-libghostty that runs agents — our CLI would be a first-class citizen inside
-it, not a reimplementation).
+**Surface decision (2026-07): terminal-first, desktop app as the flagship.**
+The browser app was retired (tag `web-final`, ~6k LOC removed); repeating it in a TUI would compete with polished terminal SQL IDEs (Harlequin) on ground that is not our moat.
+The surfaces today are the CLI and the MCP server.
+The planned flagship surface (step 7 below, decided 2026-07-25) is a native macOS desktop app: a data cockpit that embeds a libghostty terminal running Claude Code / Codex under the user's own subscription (no BYOK), with native data panels driven by the MCP channel.
+The CLI and MCP server are the app's foundation and stay first-class surfaces; the web only ever returns as an intro/landing page once the rename settles (step 8), never as a product UI.
 
 > Cursor understands code → generates code → edits code → runs code.
 > QueryPad understands datasets → infers relationships → generates SQL → executes analysis → explains findings.
@@ -223,14 +221,39 @@ competitor is cloud/warehouse-native. Build one step at a time:
    which hands over the grounding context `ask` would otherwise put in its system prompt.
    With the web app retired this is the interactive surface: the coding agent is the UI.
 6. Short planning/decomposition for multi-part questions (bounded).
-7. **Terminal host experiment** — integrate with cmux (scriptable CLI + socket API +
-   sidebar) before considering a dedicated libghostty host; only build one if the
-   experiment surfaces needs cmux cannot meet.
+7. **Native desktop app** (decided 2026-07-25) — the flagship product surface.
+   A native macOS app (Swift + AppKit) embeds a libghostty terminal pane running
+   Claude Code / Codex under the user's own subscription (no BYOK).
+   The app owns the querypad engine as a bundled subprocess and exposes the MCP
+   tools over a local socket it controls, so every tool call and result set flows
+   through the app and drives native panels (result table, relationship graph,
+   SQL history, charts).
+   The engine is not rewritten; the app is a third adapter beside `cli` and `mcp`.
+   Phases, in order:
+   1. **Gap experiment (validation, zero code)** — cmux + Claude Code +
+      `querypad mcp` on a real dataset; write down what a plain terminal cannot
+      do (results scroll away, no graph, no curation UI). That list is the app's
+      feature spec. Also A/B the CLI-only vs MCP-connected agent on the eval
+      trap questions so the grounding value is measured, not assumed.
+   2. **Embedding spike** — minimal Swift app with a GhosttyKit pane
+      (libghostty-spm) running `claude`; pin and vendor the framework, and keep
+      the terminal component behind a protocol so SwiftTerm stays a fallback.
+      Study cmux for architecture only: it is GPL-3.0, so no code may be copied
+      (QueryPad is MIT).
+   3. **Data channel** — MCP over the app-owned local socket plus the first
+      native panel: a result table updating live as the agent queries.
+   4. **Product skeleton** — per-dataset workspaces, session restore,
+      graph/chart panels, agent picker (claude / codex).
+   Constraints: macOS-only initially (the proven libghostty embedding path);
+   the Node engine ships bundled inside the .app (the native DuckDB addon rules
+   out easy single-binary compiles); distribution is gated on the rename (step 8).
 8. **Rename** (package / bin / domain / README) — *gated on formal trademark + domain
    clearance* (the name "datapad" was rejected: it collides with an active, funded
    competitor in the same category; "grain" has an npm squatter + a language collision).
    The artifact dir is already brand-independent (`.datactx/`), and npm publish waits
    for the name.
+   The desktop app's distribution (notarized DMG) and the intro/landing web page
+   also wait for it; the web surface only ever returns as that landing page.
 
 ## `querypad explain` (built)
 

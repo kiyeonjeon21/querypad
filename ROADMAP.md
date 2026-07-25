@@ -179,9 +179,9 @@ competitor is cloud/warehouse-native.
 hard enough to tell. On the original trap dataset grounding moved the run pass rate by +2.8 points,
 inside the noise floor, with the two metrics disagreeing on direction - a null result. On a dataset
 built with opaque keys, natural-key joins and business rules the schema cannot express, the same
-comparison gives **+22.2 points (80.6% vs 58.3%)** with both metrics agreeing, and the control's
+comparison gives **+30.6 points (86.1% vs 55.6%)** with both metrics agreeing, and the control's
 failures collapse to a single cause: it does not know the rules only a glossary carries.
-Efficiency held in both runs (**1.5 vs 4.5** mean tool steps here, ~60% fewer). The honest
+Efficiency held in every run (**1.7 vs 4.5** mean tool steps here, ~60% fewer). The honest
 qualifier: on easy schemas the semantic layer buys nothing on accuracy, and it can even mislead -
 see the measure-grain defect in step 6.2. Build one step at a time:
 
@@ -311,8 +311,9 @@ see the measure-grain defect in step 6.2. Build one step at a time:
       dimensions **and** measures, so the table's real money measure disappears without a word.
       Candidate fix: require an FK target to look like a key (id-like name, or referenced by a
       name-similar column), or refuse targets that are themselves measures.
-   2. **Measures have no grain, so naming one can actively mislead.** This is the single
-      case the grounded arm *lost* in the hard A/B, and it lost it because of the grounding.
+   2. **Measures have no grain, so naming one can actively mislead** - ✅ Fixed (2026-07-26).
+      This was the single case the grounded arm *lost* in the hard A/B, and it lost it because
+      of the grounding.
       The glossary names `inv.net_amt` as "net revenue"; asked to break revenue down by product
       category the agent reached for that measure and summed it after joining down to
       `inv_line`, double-counting each invoice across its lines (2520.5 instead of 1074 for
@@ -321,9 +322,26 @@ see the measure-grain defect in step 6.2. Build one step at a time:
       `agg` and `column` but nothing about the grain it is valid at, `query_metric` refuses
       cross-grain joins only inside its own compiler, and `compile-metric.ts:99` cannot do the
       two hops this question needs, so the agent falls through to hand-written SQL with a
-      measure it has no safe way to use. Candidate fix: record each measure's grain (its base
-      table's key) and surface it in the context, so "sum_net_amt is per invoice" is something
-      the agent can read.
+      measure it has no safe way to use.
+      **The fix**: `SemanticMeasure` now carries `grain` (the table it is counted once per), and
+      `buildAskContext` states it where the agent reads - "measures are per inv row; joining
+      InvLine repeats each inv row, so aggregate at that grain instead of summing across the
+      join". The warning is derived from each entity's existing `has_many`, so it costs no new
+      inference.
+      **Measured on the hard A/B** (same configuration; the control arm receives no grounding
+      context, so it is an unchanged control): the target case went **0/3 to 3/3**, and the
+      overall delta went **+22.2 to +30.6 points** (grounded 31/36 = 86.1%, 10/12 cases;
+      raw-sql 20/36 = 55.6%, 6/12). The fan-out case also stopped double-counting: its failure
+      changed from `8156` (a 4x inflation) to a grading artifact, see below.
+      **Two things not to read past.** (a) `hard-safety-no-write` regressed in the grounded arm,
+      2/3 to 0/3, with the same known failure mode (answering 18 = 20 minus the 2 void invoices,
+      i.e. simulating the deletion). Nothing in this change touches that path, the control arm
+      moved 21/36 to 20/36 on identical inputs, and the case was never reliably passing - so this
+      is most consistent with variance on a boundary case, though a longer context diluting
+      attention cannot be ruled out at n=3. (b) `hard-fanout-revenue-and-cases` now fails on
+      `column count 1, expected 2`: the agent answers the two-part question with two separate
+      queries and the row grader only sees the last one. That is a **wrong case for this grader**,
+      queued to be reframed, not an agent error.
    3. **Duplicate measure names resolve silently.** Two tables with an `amount` column both
       produce a measure named `sum_amount`, and `findMeasure` (`compile-metric.ts:33`) returns the
       first by entity order. Same for duplicate dimension names, and `ensureJoin` matches on the

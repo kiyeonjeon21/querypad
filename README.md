@@ -251,8 +251,8 @@ suite has produced:
 | | dataset | grounded | raw-sql | delta |
 |---|---|---|---|---|
 | run pass rate | original | 29/36 (80.6%) | 28/36 (77.8%) | +2.8 |
-| run pass rate | **hard** | **29/36 (80.6%)** | **21/36 (58.3%)** | **+22.2** |
-| mean tool steps | hard | **1.5** | 4.5 | ~60% fewer |
+| run pass rate | **hard** | **31/36 (86.1%)** | **20/36 (55.6%)** | **+30.6** |
+| mean tool steps | hard | **1.7** | 4.5 | ~60% fewer |
 
 On the original 7-table dataset the grounding buys **nothing measurable on accuracy**: +2.8
 points is inside the noise floor, the two metrics disagree on direction, and 8 of 12 cases pass
@@ -262,11 +262,11 @@ On the hard dataset it wins clearly, and for a legible reason: every one of the 
 failures traces to the same thing - it does not exclude void invoices, a business rule the
 schema cannot express and only the glossary carries. Two cases go 3/3 versus **0/3**.
 
-Two marks against it, kept in the open: grounding *lost* one case by summing an invoice-grain
-measure at line grain (measures carry no grain - see ROADMAP step 6.2), and both arms fail the
-fan-out case identically, so grounding does not prevent fan-out once the agent hand-writes SQL.
-Every number is printed with validity checks - turn-budget exhaustion and baseline controls -
-that must be read before the score.
+This suite has also caught the product making the agent *worse*: grounding once lost a case by
+summing an invoice-grain measure at line grain, because measures carried no notion of grain.
+Fixing that (ROADMAP step 6.2) moved the delta from +22.2 to +30.6 - which is the whole point of
+keeping a scoreboard. Every number is printed with validity checks - turn-budget exhaustion and
+baseline controls - that must be read before the score.
 
 ## `explain`: justify every join
 

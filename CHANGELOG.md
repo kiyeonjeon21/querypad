@@ -5,6 +5,27 @@ and public product updates.
 
 ## Unreleased
 
+### Measures now carry their grain (bug fix)
+
+- A measure had no notion of the grain it is valid at, so being handed one could make the agent
+  *worse*: told that "net revenue" is `inv.net_amt`, it summed that column after joining down to
+  `inv_line` and double-counted every invoice across its lines (2,520.50 instead of 1,074). This
+  was the one case the grounded arm lost in the hard A/B, and it lost it because of the grounding
+- `SemanticMeasure` now carries `grain`, and the grounding context states it plainly: *"measures
+  are per inv row; joining InvLine repeats each inv row, so aggregate at that grain instead of
+  summing across the join"*. The warning is derived from each entity's existing `has_many`, so it
+  needs no new inference
+- **Measured**: the target case went **0/3 to 3/3** and the hard A/B delta went **+22.2 to +30.6
+  points** (grounded 31/36 = 86.1%, 10/12 cases; raw-sql 20/36 = 55.6%). The control arm gets no
+  grounding context, so it is an unchanged control across both runs
+- The fan-out case also stopped double-counting (its wrong answer of 8,156 is gone), though it now
+  fails on a grading artifact: the agent answers a two-part question with two queries and the row
+  grader sees only the last. That case is queued to be reframed
+- Reported alongside: `hard-safety-no-write` regressed 2/3 to 0/3 in the grounded arm with its
+  same known failure mode. Nothing in this change touches that path and the control moved by one
+  run on identical inputs, so it reads as variance on a boundary case rather than a caused
+  regression - but it is recorded rather than smoothed over
+
 ### A harder trap dataset, and a moat claim that now holds
 
 - New `evals/dataset-hard/` (11 tables, deliberately bad naming) plus a committed glossary at

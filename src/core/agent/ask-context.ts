@@ -53,6 +53,15 @@ function renderEntities(model: SemanticModel): string {
     if (entity.measures.length > 0) {
       const measures = entity.measures.map((m) => `${m.name} (${m.agg})${annotation(m)}`).join(", ");
       lines.push(`    measures: ${measures}`);
+      // A measure is one value per its own row. Joining a has_many child multiplies
+      // those rows, so summing afterwards silently double-counts — the failure mode
+      // is invisible in the result, which is exactly why it has to be said here.
+      if (entity.hasMany.length > 0) {
+        lines.push(
+          `    measures are per ${entity.table} row; joining ${entity.hasMany.join(" or ")} ` +
+            `repeats each ${entity.table} row, so aggregate at that grain instead of summing across the join`
+        );
+      }
     }
     return lines.join("\n");
   });

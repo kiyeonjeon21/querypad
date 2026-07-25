@@ -55,6 +55,12 @@ export interface SemanticMeasure {
   name: string;
   agg: "count" | "sum";
   column?: string;
+  /**
+   * The table this measure is counted once per. Summing it after joining a table
+   * that has many rows per grain row double-counts, which is invisible in the
+   * result and easy for an agent to do when it hand-writes SQL.
+   */
+  grain?: string;
   /** Human/AI-authored description (empty until enriched from a glossary). */
   description?: string;
   /**

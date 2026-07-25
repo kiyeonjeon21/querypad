@@ -23,7 +23,7 @@ QueryPad answers those questions first, then generates and runs the SQL.
 ## Install
 
 ```bash
-git clone https://github.com/vericontext/querypad && cd querypad
+git clone https://github.com/kiyeonjeon21/querypad && cd querypad
 npm install && npm run build && npm link
 ```
 

@@ -86,11 +86,19 @@ export function compileMetric(
   // Ensure the fact table can reach `target` via a single many-to-one hop (no fan-out).
   const ensureJoin = (target: string, what: string): string | null => {
     if (target === base || joins.has(target)) return null;
-    const forward = relationships.find((r) => r.from.table === base && r.to.table === target);
-    if (forward) {
+    const forward = relationships.filter((r) => r.from.table === base && r.to.table === target);
+    // More than one key into the same table (billing vs shipping region) means the
+    // grouping is genuinely ambiguous. Picking the first edge would answer a question
+    // the user did not ask, and the result would look perfectly ordinary.
+    if (forward.length > 1) {
+      const keys = forward.map((r) => `${base}.${r.from.column}`).join(" or ");
+      return `Cannot use "${what}": ${base} joins ${target} through more than one key (${keys}), so this grouping is ambiguous. Write the SQL directly and pick the one you mean.`;
+    }
+    if (forward.length === 1) {
+      const edge = forward[0];
       joins.set(
         target,
-        `JOIN ${qi(target)} ON ${qi(base)}.${qi(forward.from.column)} = ${qi(target)}.${qi(forward.to.column)}`
+        `JOIN ${qi(target)} ON ${qi(base)}.${qi(edge.from.column)} = ${qi(target)}.${qi(edge.to.column)}`
       );
       return null;
     }

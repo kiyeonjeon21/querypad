@@ -5,6 +5,17 @@ and public product updates.
 
 ## Unreleased
 
+### An ambiguous join is refused instead of guessed (bug fix)
+
+- `ensureJoin` matched on the table pair rather than the column, so a table with two foreign keys
+  into the same target - billing region and shipping region - silently joined on whichever edge
+  sorted first. The result looked perfectly ordinary while answering a question the user had not
+  asked
+- It now refuses and names both candidate keys, so the agent can write the SQL it actually means.
+  That matches how the compiler already handles fan-out: refuse rather than guess
+- Both engine suites are unchanged (18/18, 25/25); a regression test pins a fixture where both
+  edges are inferred at 93%
+
 ### Plan-first turn for multi-part questions
 
 - Asked for revenue *and* ticket counts per customer, the agent wrote one query joining both

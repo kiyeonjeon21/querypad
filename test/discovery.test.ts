@@ -209,3 +209,52 @@ test("colliding measure names are table-qualified on every side", async () => {
     db.close();
   }
 });
+
+test("two keys into the same table make a grouping ambiguous, and it is refused", async () => {
+  const { buildSemanticModel } = await import("../src/core/discovery/semantic-model");
+  const { compileMetric } = await import("../src/core/discovery/compile-metric");
+  const { mkdtemp, writeFile } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { resolveSource } = await import("../src/adapters/cli/source");
+
+  const dir = await mkdtemp(path.join(tmpdir(), "querypad-ambig-join-"));
+  // `tier` repeats, so it survives the categorical ratio rule and is groupable.
+  await writeFile(
+    path.join(dir, "regions.csv"),
+    "id,name,tier\n1,West,core\n2,East,core\n3,North,edge\n4,South,edge\n5,Central,core\n6,Far,edge\n"
+  );
+  await writeFile(
+    path.join(dir, "orders.csv"),
+    "id,billing_region_id,shipping_region_id,amount\n" +
+      "1,1,2,10.0\n2,1,3,20.0\n3,2,1,30.0\n4,3,4,40.0\n5,4,2,50.0\n6,5,6,60.0\n"
+  );
+
+  const db = await createNodeDb();
+  try {
+    const { tables } = await resolveSource({ folder: dir }).load(db.runner);
+    const profiles = await Promise.all(tables.map((t) => profileTable(t, db.runner, 1)));
+    const rels = await discoverRelationships(profiles, db.runner);
+    // Both foreign keys are real and both are inferred.
+    const keys = rels.map(relationshipKey);
+    assert.ok(keys.includes("orders.billing_region_id->regions.id"), keys.join(","));
+    assert.ok(keys.includes("orders.shipping_region_id->regions.id"), keys.join(","));
+
+    const model = buildSemanticModel(tables.map((t) => t.name), rels, 1, profiles);
+    const compiled = compileMetric(model, rels, {
+      metric: "orders_count",
+      dimensions: ["tier"],
+    });
+
+    // Silently joining on whichever edge sorted first would answer a question the
+    // user did not ask, and the result would look perfectly ordinary.
+    assert.equal(compiled.ok, false, "an ambiguous grouping must not compile");
+    if (!compiled.ok) {
+      assert.match(compiled.error, /more than one key/);
+      // The refusal has to name both candidates, or the agent cannot act on it.
+      assert.match(compiled.error, /billing_region_id/);
+      assert.match(compiled.error, /shipping_region_id/);
+    }
+  } finally {
+    db.close();
+  }
+});
